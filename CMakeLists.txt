@@ -23,6 +23,7 @@ add_library(piu_core STATIC
   src/core/assets.cpp
   src/core/attract.cpp
   src/core/bga_player.cpp
+  src/core/calibration_screen.cpp
   src/core/credit_hud.cpp
   src/core/game.cpp
   src/core/json.cpp
@@ -33,7 +34,8 @@ add_library(piu_core STATIC
   src/core/select_screen.cpp
   src/core/service_menu.cpp
   src/core/song_data.cpp
-  src/core/stage_cfg.cpp)
+  src/core/stage_cfg.cpp
+  src/core/ui_atlas.cpp)
 target_include_directories(piu_core PUBLIC src)
 
 add_library(piu_formats STATIC src/extractor/formats.cpp)

@@ -55,8 +55,7 @@ void Audio::close() {
 namespace {
 
 template <typename Sample>
-std::shared_ptr<const Sample> read_wav(const std::filesystem::path& path) {
-  const std::optional<std::string> file = read_file(path);
+std::shared_ptr<const Sample> parse_wav(const std::optional<std::string>& file) {
   if (!file || file->size() < 12 || file->compare(0, 4, "RIFF") != 0 || file->compare(8, 4, "WAVE") != 0) return nullptr;
   auto sample = std::make_shared<Sample>();
   bool valid_format = false;
@@ -75,6 +74,11 @@ std::shared_ptr<const Sample> read_wav(const std::filesystem::path& path) {
     at = body + size + (size & 1);
   }
   return valid_format && !sample->pcm.empty() ? sample : nullptr;
+}
+
+template <typename Sample>
+std::shared_ptr<const Sample> read_wav(const std::filesystem::path& path) {
+  return parse_wav<Sample>(read_file(path));
 }
 
 }  // namespace
@@ -109,7 +113,14 @@ void Audio::stop_sounds() {
 }
 
 bool Audio::play_music(const std::filesystem::path& path, bool loop) {
-  std::shared_ptr<const Sample> sample = read_wav<Sample>(path);
+  return start_music(read_wav<Sample>(path), loop);
+}
+
+bool Audio::play_music_data(const std::string& wav, bool loop) {
+  return start_music(parse_wav<Sample>(wav), loop);
+}
+
+bool Audio::start_music(std::shared_ptr<const Sample> sample, bool loop) {
   if (!sample) return false;
   Voice next;
   next.sample = std::move(sample);

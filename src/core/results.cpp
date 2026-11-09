@@ -189,7 +189,7 @@ void ResultsScreen::draw_row(DrawList& out, int row, Color color, bool final_val
       const int frame = digit - 0x26;
       const auto u0 = static_cast<float>(32 * (frame % 8));
       const auto v0 = static_cast<float>(39 * (frame / 8));
-      emit(out, digits_, x, static_cast<float>(kRowY[r]), 32.0f, 39.0f, u0, v0, u0 + 32.0f, v0 + 39.0f, color);
+      emit(out, digits_, x, static_cast<float>(kRowY[r]), 32.0f, 39.0f, u0, v0, u0 + 31.0f, v0 + 38.0f, color);
       x += 25.0f;
     }
   }
@@ -212,7 +212,7 @@ void ResultsScreen::draw(DrawList& out) const {
       const int frame = digit - '0';
       const auto u0 = static_cast<float>(32 * (frame % 8));
       const auto v0 = static_cast<float>(39 * (frame / 8));
-      emit(out, digits_, x, 420.0f, 32.0f, 35.0f, u0, v0, u0 + 32.0f, v0 + 35.0f, white);
+      emit(out, digits_, x, 420.0f, 32.0f, 35.0f, u0, v0, u0 + 31.0f, v0 + 38.0f, white);
       x += 25.0f;
     }
   }

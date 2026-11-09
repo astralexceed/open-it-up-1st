@@ -16,7 +16,9 @@
 #include "core/clock.h"
 #include "core/frame_limiter.h"
 #include "core/game.h"
+#include "core/calibration_screen.h"
 #include "core/key_map_screen.h"
+#include "core/ui_atlas.h"
 #include "core/machine_settings.h"
 #include "core/results.h"
 #include "core/scene.h"
@@ -32,6 +34,11 @@ struct Engine {
   piu::FixedClock clock;
   piu::FrameLimiter frame_limiter;
   std::optional<piu::KeyMapScreen> key_map;
+  std::optional<piu::CalibrationScreen> calibration;
+  std::string calibration_track;
+  piu::FixedClock calibration_clock;
+  bool calibration_clock_running = false;
+  int audio_offset_ms = 0;
   piu::Texture key_map_atlas;
   std::string key_map_text;
   piu::GlRenderer renderer;
@@ -174,7 +181,7 @@ PIU_EXPORT int piu_begin(int p1_word, int p2_word, int margin, int double_play, 
     return 0;
   }
   engine->game.emplace(std::move(game));
-  engine->clock.start(now_ms, song_ms);
+  engine->clock.start(now_ms, song_ms - engine->audio_offset_ms);
   return 1;
 }
 
@@ -251,12 +258,15 @@ PIU_EXPORT const char* piu_keymap_normalize(const char* text) {
   engine->key_map_text = piu::KeyMap::parse(text).value_or(piu::KeyMap()).serialize();
   return engine->key_map_text.c_str();
 }
+static void make_screen_atlas() {
+  if (engine->key_map_atlas.valid()) return;
+  const piu::UiAtlas atlas = piu::make_ui_atlas();
+  engine->key_map_atlas = {engine->renderer.begin_texture(), atlas.width, atlas.height};
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, atlas.width, atlas.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, atlas.rgba.data());
+}
+
 PIU_EXPORT void piu_keymap_open(const char* text, int spanish) {
-  if (!engine->key_map_atlas.valid()) {
-    const piu::KeyMapAtlas atlas = piu::make_key_map_atlas();
-    engine->key_map_atlas = {engine->renderer.begin_texture(), atlas.width, atlas.height};
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, atlas.width, atlas.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, atlas.rgba.data());
-  }
+  make_screen_atlas();
   engine->key_map.emplace(piu::KeyMap::parse(text).value_or(piu::KeyMap()), spanish != 0, engine->key_map_atlas);
 }
 PIU_EXPORT void piu_keymap_key(const char* code) {
@@ -277,6 +287,46 @@ PIU_EXPORT const char* piu_keymap_result() {
 }
 PIU_EXPORT void piu_keymap_close() { engine->key_map.reset(); }
 
+PIU_EXPORT const char* piu_calibration_track() {
+  if (engine->calibration_track.empty()) engine->calibration_track = piu::make_click_track();
+  return engine->calibration_track.data();
+}
+PIU_EXPORT int piu_calibration_track_size() {
+  piu_calibration_track();
+  return static_cast<int>(engine->calibration_track.size());
+}
+PIU_EXPORT void piu_calibration_open(int current_ms, int spanish) {
+  make_screen_atlas();
+  engine->calibration.emplace(current_ms, spanish != 0, engine->key_map_atlas);
+  engine->calibration_clock_running = false;
+}
+PIU_EXPORT void piu_calibration_tap(double time_ms) {
+  if (engine->calibration && engine->calibration_clock_running) {
+    engine->calibration->tap(engine->calibration_clock.song_ms_at(time_ms));
+  }
+}
+PIU_EXPORT void piu_calibration_cancel() {
+  if (engine->calibration) engine->calibration->cancel();
+}
+PIU_EXPORT void piu_calibration_click(double px, double py, int width, int height) {
+  if (!engine->calibration) return;
+  float x = 0.0f;
+  float y = 0.0f;
+  engine->renderer.to_screen(static_cast<float>(px), static_cast<float>(py), width, height, x, y);
+  engine->calibration->click(x, y);
+}
+PIU_EXPORT int piu_calibration_wants_audio() { return engine->calibration && engine->calibration->wants_audio() ? 1 : 0; }
+PIU_EXPORT int piu_calibration_finished() {
+  return engine->calibration ? static_cast<int>(engine->calibration->result()) : 0;
+}
+PIU_EXPORT int piu_calibration_result() { return engine->calibration ? engine->calibration->offset_ms() : 0; }
+PIU_EXPORT void piu_calibration_close() {
+  engine->calibration.reset();
+  engine->calibration_track.clear();
+  engine->calibration_track.shrink_to_fit();
+}
+PIU_EXPORT void piu_set_audio_offset(int ms) { engine->audio_offset_ms = ms; }
+
 // 1 when the next frame may be drawn.
 PIU_EXPORT int piu_frame_due(double now_ms) { return engine != nullptr && engine->frame_limiter.due(now_ms) ? 1 : 0; }
 
@@ -286,7 +336,18 @@ PIU_EXPORT void piu_frame(double now_ms, double audio_ms, int width, int height)
     return;
   }
   engine->draw_list.clear();
-  if (engine->key_map) {
+  if (engine->calibration) {
+    // The same clock as a song, so what it measures is what a song needs.
+    if (audio_ms < 0.0) {
+      engine->calibration_clock_running = false;
+    } else if (engine->calibration_clock_running) {
+      engine->calibration_clock.resync(now_ms, audio_ms);
+    } else {
+      engine->calibration_clock.start(now_ms, audio_ms);
+      engine->calibration_clock_running = true;
+    }
+    engine->calibration->draw(engine->draw_list);
+  } else if (engine->key_map) {
     engine->key_map->draw(engine->draw_list);
   } else if (engine->service) {
     engine->service->draw(engine->draw_list);
@@ -301,7 +362,7 @@ PIU_EXPORT void piu_frame(double now_ms, double audio_ms, int width, int height)
   } else if (engine->game) {
     const bool has_audio = audio_ms >= 0.0;
     if (has_audio) {
-      engine->clock.resync(now_ms, audio_ms);
+      engine->clock.resync(now_ms, audio_ms - engine->audio_offset_ms);
     }
     const int due = engine->clock.advance(
         now_ms, has_audio ? piu::FixedClock::kNoCatchUpLimit : piu::FixedClock::kMaxCatchUp);

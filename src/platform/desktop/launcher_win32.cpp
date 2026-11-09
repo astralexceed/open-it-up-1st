@@ -17,7 +17,9 @@
 namespace piu::desktop {
 namespace {
 
-constexpr int kContentWidth = 440;
+constexpr int kColumnWidth = 400;
+constexpr int kColumnGap = 48;
+constexpr int kContentWidth = kColumnWidth * 2 + kColumnGap;
 constexpr UINT kProgressMessage = WM_APP + 1;
 constexpr UINT kDoneMessage = WM_APP + 2;
 constexpr COLORREF kPanel = RGB(0x17, 0x15, 0x28);
@@ -27,7 +29,7 @@ constexpr COLORREF kSoft = RGB(0xa7, 0xa1, 0xc4);
 constexpr COLORREF kSky = RGB(0x87, 0xce, 0xeb);
 constexpr COLORREF kWarn = RGB(0xff, 0x8a, 0x5c);
 
-enum Control { kChooseChd = 101, kAddSounds, kLaunch, kAspect, kLanguage, kDisplay, kMapKeys };
+enum Control { kChooseChd = 101, kAddSounds, kLaunch, kAspect, kLanguage, kDisplay, kMapKeys, kCalibrate };
 
 struct Text {
   const char* key;
@@ -56,6 +58,7 @@ const Text kTexts[] = {
     {"displayWindowed", "Windowed", "Ventana"},
     {"displayFullscreen", "Fullscreen", "Pantalla completa"},
     {"mapControls", "Map controls", "Mapear controles"},
+    {"calibrateAudio", "Calibrate audio", "Calibrar audio"},
     {"launch", "Launch game", "Lanzar juego"},
     {"chooseChd", "Choose CHD file", "Elegir archivo CHD"},
     {"changeChd", "Change CHD file", "Cambiar archivo CHD"},
@@ -89,6 +92,8 @@ struct Item {
   HWND hwnd;
   Kind kind;
   HFONT font;
+  // 0 or 1 for a column; -1 across the whole window.
+  int column;
 };
 
 struct Job {
@@ -146,6 +151,7 @@ class Launcher {
   HFONT heading_ = nullptr;
   HFONT small_ = nullptr;
   std::vector<Item> items_;
+  int column_ = -1;
   std::vector<std::pair<HWND, const char*>> translated_;
   std::vector<HWND> soft_;
   HWND status_ = nullptr;
@@ -155,6 +161,7 @@ class Launcher {
   HWND add_sounds_ = nullptr;
   HWND launch_ = nullptr;
   HWND map_keys_ = nullptr;
+  HWND calibrate_ = nullptr;
   HWND aspect_ = nullptr;
   HWND language_ = nullptr;
   HWND display_ = nullptr;
@@ -182,7 +189,7 @@ HWND Launcher::add(const wchar_t* type, DWORD style, Item::Kind kind, HFONT font
   const HWND control = CreateWindowExW(0, type, L"", WS_CHILD | WS_VISIBLE | style, 0, 0, 10, 10, window_,
                                        reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), instance_, nullptr);
   SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
-  items_.push_back({control, kind, font});
+  items_.push_back({control, kind, font, column_});
   return control;
 }
 
@@ -206,6 +213,7 @@ HWND Launcher::add_combo(const char* label, int id) {
 void Launcher::build() {
   add(L"STATIC", SS_OWNERDRAW, Item::Kind::kTitle, title_font_);
   add_separator();
+  column_ = 0;
   add_label("instructions", heading_);
   add_label("loadOriginals", body_);
   add_label("chdUse", body_);
@@ -220,29 +228,36 @@ void Launcher::build() {
   sound_status_ = add_label(nullptr, small_, true);
   add_label("extractNote", small_, true);
   add_label("legalNote", small_, true);
-  add_separator();
+  column_ = 1;
   add_label("additionalSettings", heading_);
   aspect_ = add_combo("aspectRatio", kAspect);
   language_ = add_combo("menuLanguage", kLanguage);
   display_ = add_combo("displayMode", kDisplay);
   map_keys_ = add(L"BUTTON", BS_PUSHBUTTON | WS_TABSTOP, Item::Kind::kButton, body_, kMapKeys);
+  calibrate_ = add(L"BUTTON", BS_PUSHBUTTON | WS_TABSTOP, Item::Kind::kButton, body_, kCalibrate);
   add_separator();
   launch_ = add(L"BUTTON", BS_DEFPUSHBUTTON | WS_TABSTOP, Item::Kind::kButton, body_, kLaunch);
 }
 
 // Places the controls top to bottom, and the window follows its content.
 void Launcher::layout() {
-  const int width = scaled(kContentWidth);
-  const int gap = scaled(8);
-  const int left = scaled(20);
-  int y = scaled(16);
+  const int total_width = scaled(kContentWidth);
+  const int column_width = scaled(kColumnWidth);
+  const int gap = scaled(12);
+  const int left = scaled(36);
+  int top = scaled(32);
+  int column_y[2] = {top, top};
   const HDC dc = GetDC(window_);
   for (const Item& item : items_) {
     if (item.kind == Item::Kind::kProgress && (GetWindowLongW(item.hwnd, GWL_STYLE) & WS_VISIBLE) == 0) continue;
-    int height = scaled(30);
+    const bool across = item.column < 0;
+    const int width = across ? total_width : column_width;
+    const int x = left + (item.column == 1 ? column_width + scaled(kColumnGap) : 0);
+    int& y = across ? top : column_y[item.column];
+    int height = scaled(36);
     int control_height = 0;
     switch (item.kind) {
-      case Item::Kind::kTitle: height = scaled(42); break;
+      case Item::Kind::kTitle: height = scaled(44); break;
       case Item::Kind::kSeparator: height = 1; break;
       case Item::Kind::kCombo:
         height = scaled(26);
@@ -261,13 +276,14 @@ void Launcher::layout() {
         break;
       }
     }
-    SetWindowPos(item.hwnd, nullptr, left, y, width, control_height != 0 ? control_height : height, SWP_NOZORDER | SWP_NOACTIVATE);
+    SetWindowPos(item.hwnd, nullptr, x, y, width, control_height != 0 ? control_height : height, SWP_NOZORDER | SWP_NOACTIVATE);
     y += height + gap;
+    if (across) column_y[0] = column_y[1] = top;
   }
   ReleaseDC(window_, dc);
 
   const DWORD style = static_cast<DWORD>(GetWindowLongW(window_, GWL_STYLE));
-  RECT frame = {0, 0, width + left * 2, y + scaled(10)};
+  RECT frame = {0, 0, total_width + left * 2, std::max(column_y[0], column_y[1]) + scaled(24)};
   AdjustWindowRect(&frame, style, FALSE);
   SetWindowPos(window_, nullptr, 0, 0, frame.right - frame.left, frame.bottom - frame.top, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
@@ -306,6 +322,8 @@ void Launcher::render_controls() {
   SetWindowTextW(launch_, wide(text("launch")).c_str());
   SetWindowTextW(map_keys_, wide(text("mapControls")).c_str());
   EnableWindow(map_keys_, !busy_);
+  SetWindowTextW(calibrate_, wide(text("calibrateAudio")).c_str());
+  EnableWindow(calibrate_, !busy_);
   SetWindowTextW(sound_status_, wide(text(state_.sounds_ready ? "soundsReady" : "noSounds")).c_str());
   EnableWindow(choose_chd_, !busy_);
   EnableWindow(add_sounds_, !busy_ && state_.ready);
@@ -413,6 +431,8 @@ LRESULT Launcher::handle(HWND window, UINT message, WPARAM wparam, LPARAM lparam
         start_job(true, L"piu10.u9 (*.u9)\0*.u9\0");
       } else if (id == kMapKeys) {
         leave_for(Start::kKeyMap);
+      } else if (id == kCalibrate) {
+        leave_for(Start::kCalibration);
       } else if ((id == kLaunch || id == IDOK) && IsWindowEnabled(launch_)) {
         leave_for(Start::kGame);
       }
@@ -513,6 +533,7 @@ void open_application(Start start) {
   std::wstring command = L"\"" + std::wstring(path) + L"\"";
   if (start == Start::kGame) command += L" --play";
   if (start == Start::kKeyMap) command += L" --keys";
+  if (start == Start::kCalibration) command += L" --calibrate";
   STARTUPINFOW startup{};
   startup.cb = sizeof(startup);
   PROCESS_INFORMATION process{};

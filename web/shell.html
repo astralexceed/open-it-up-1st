@@ -14,11 +14,16 @@
   canvas.keymap { position: fixed; left: 50%; top: 50%; width: min(640px, 100vw, 133.33vh); height: min(480px, 75vw, 100vh); transform: translate(-50%, -50%); }
   #menu { position: fixed; inset: 0; display: flex; padding: 16px; overflow: auto; }
   #menu[hidden] { display: none; }
-  .card { width: min(440px, 100%); margin: auto; background: var(--panel); border: 1px solid var(--line); padding: 22px; display: grid; gap: 16px; }
+  .card { width: min(1040px, 100%); margin: auto; background: var(--panel); border: 1px solid var(--line); padding: 40px; display: grid; gap: 24px; }
   h1 { font-size: 24px; margin: 0; letter-spacing: .01em; }
+  .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 56px; }
+  .column { display: grid; gap: 24px; align-content: start; }
+  .column.side { grid-template-rows: 1fr auto; align-content: stretch; }
+  .column.side section:last-child { align-self: end; }
+  @media (max-width: 720px) { .card { padding: 24px; } .columns { grid-template-columns: 1fr; } .column.side { grid-template-rows: none; } }
   h1 span { color: var(--sky); }
-  .field { display: grid; gap: 4px; color: var(--soft); font-size: 13px; }
-  select, button, .pick { font: inherit; color: var(--ink); background: var(--raised); border: 1px solid var(--line); border-radius: 3px; padding: 8px 10px; width: 100%; }
+  .field { display: grid; gap: 6px; color: var(--soft); font-size: 13px; }
+  select, button, .pick { font: inherit; color: var(--ink); background: var(--raised); border: 1px solid var(--line); border-radius: 3px; padding: 11px 12px; width: 100%; }
   .pick { display: block; text-align: center; cursor: pointer; background: var(--yellow); color: #17130a; font-weight: 700; border-color: transparent; }
   .pick input { position: absolute; opacity: 0; width: 1px; height: 1px; }
   .pick.quiet { background: var(--raised); color: var(--ink); font-weight: 400; border-color: var(--line); }
@@ -29,9 +34,9 @@
   button:disabled, select:disabled { opacity: .5; cursor: default; }
   #status { margin: 0; color: var(--soft); font-size: 13px; min-height: 19px; white-space: pre-line; font-variant-numeric: tabular-nums; }
   #status.warn { color: var(--warn); }
-  section { display: grid; gap: 8px; padding-top: 16px; border-top: 1px solid var(--line); }
+  section { display: grid; gap: 12px; padding-top: 24px; border-top: 1px solid var(--line); }
   section p, section ul { margin: 0; font-size: 13px; }
-  section ul { padding-left: 18px; display: grid; gap: 4px; }
+  section ul { padding-left: 18px; display: grid; gap: 6px; }
   code { color: var(--yellow); font: 12px ui-monospace, Menlo, Consolas, monospace; }
   h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--soft); }
   progress { width: 100%; height: 8px; accent-color: var(--yellow); }
@@ -44,6 +49,8 @@
 <div id="menu">
   <div class="card">
     <h1>Open <span>It UP</span>: 1st Preservation</h1>
+    <div class="columns">
+    <div class="column">
     <section>
       <h2 data-i18n="instructions"></h2>
       <p data-i18n="loadOriginals"></p>
@@ -67,6 +74,8 @@
       <p class="note" data-i18n="storageNote"></p>
       <p class="note" data-i18n="legalNote"></p>
     </section>
+    </div>
+    <div class="column side">
     <section>
       <h2 data-i18n="additionalSettings"></h2>
       <label class="field"><span data-i18n="aspectRatio"></span>
@@ -79,10 +88,13 @@
         <select id="display"><option value="windowed" data-i18n="displayWindowed"></option><option value="fullscreen" data-i18n="displayFullscreen"></option></select>
       </label>
       <button id="mapKeys" type="button" data-i18n="mapControls"></button>
+      <button id="calibrate" type="button" data-i18n="calibrateAudio"></button>
     </section>
     <section>
       <button id="run" type="button" disabled data-i18n="launch"></button>
     </section>
+    </div>
+    </div>
   </div>
 </div>
 <audio id="audio" preload="auto"></audio>
@@ -97,6 +109,7 @@
   const TRACK_OFFSET = 5;
   const KEY_COIN_1 = 10, KEY_COIN_2 = 11, KEY_TEST = 12, KEY_SERVICE = 13, KEY_CLEAR = 14;
   let keysText = "", keyActions = new Map(), inKeyMap = false;
+  let inCalibration = false, calibrationBeating = false, audioOffset = 0;
 
   const files = new Map();
   const charts = new Map();
@@ -115,6 +128,7 @@
   const ASPECT_KEY = "open-it-up-aspect";
   const DISPLAY_KEY = "open-it-up-display";
   const KEYS_KEY = "open-it-up-keys";
+  const AUDIO_OFFSET_KEY = "open-it-up-audio-offset";
 
   const baseName = name => name.trim().replace(/^.*[\\/]/, "").replace(/\.[^.]+$/, "").toLowerCase();
 
@@ -142,6 +156,7 @@
       displayWindowed: "Windowed",
       displayFullscreen: "Fullscreen",
       mapControls: "Map controls",
+      calibrateAudio: "Calibrate audio",
       launch: "Launch game",
       chooseChd: "Choose CHD file",
       changeChd: "Change CHD file",
@@ -185,6 +200,7 @@
       displayWindowed: "Ventana",
       displayFullscreen: "Pantalla completa",
       mapControls: "Mapear controles",
+      calibrateAudio: "Calibrar audio",
       launch: "Lanzar juego",
       chooseChd: "Elegir archivo CHD",
       changeChd: "Cambiar archivo CHD",
@@ -722,6 +738,53 @@
     menu.hidden = false;
   }
 
+  function restoreAudioOffset() {
+    try { audioOffset = Number(localStorage.getItem(AUDIO_OFFSET_KEY)) || 0; } catch { /* No offset it is. */ }
+    Module._piu_set_audio_offset(audioOffset);
+  }
+
+  function openCalibration() {
+    const size = Module._piu_calibration_track_size();
+    const start = Module._piu_calibration_track();
+    audio.src = URL.createObjectURL(new Blob([Module.HEAPU8.slice(start, start + size)], { type: "audio/wav" }));
+    Module._piu_calibration_open(audioOffset, language === "es" ? 1 : 0);
+    inCalibration = true;
+    calibrationBeating = false;
+    audio.loop = true;
+    Module._piu_set_wide(0);
+    canvas.classList.add("keymap");
+    menu.hidden = true;
+    syncCalibrationBeat();
+  }
+
+  function syncCalibrationBeat() {
+    const wanted = Module._piu_calibration_wants_audio() === 1;
+    if (wanted && !calibrationBeating) {
+      audio.currentTime = 0;
+      audio.play().catch(() => {});
+    } else if (!wanted && calibrationBeating) {
+      audio.pause();
+    }
+    calibrationBeating = wanted;
+  }
+
+  function closeCalibration(result) {
+    if (result === 1) {
+      audioOffset = Module._piu_calibration_result();
+      try { localStorage.setItem(AUDIO_OFFSET_KEY, String(audioOffset)); } catch { /* Lasts until the page closes. */ }
+      Module._piu_set_audio_offset(audioOffset);
+    }
+    Module._piu_calibration_close();
+    inCalibration = false;
+    audio.pause();
+    audio.loop = false;
+    URL.revokeObjectURL(audio.src);
+    audio.removeAttribute("src");
+    Module._piu_set_wide(Number($("aspect").value));
+    canvas.classList.remove("keymap");
+    menu.hidden = false;
+  }
+
   function restoreDisplay() {
     let display = "windowed";
     try { if (localStorage.getItem(DISPLAY_KEY) === "fullscreen") display = "fullscreen"; } catch { /* Windowed it is. */ }
@@ -750,8 +813,16 @@
     restoreAspect();
     restoreDisplay();
     restoreKeys();
+    restoreAudioOffset();
     $("mapKeys").addEventListener("click", openKeyMap);
+    $("calibrate").addEventListener("click", openCalibration);
     canvas.addEventListener("mousedown", event => {
+      if (inCalibration) {
+        const scale = devicePixelRatio || 1;
+        Module._piu_calibration_click(event.offsetX * scale, event.offsetY * scale, canvas.width, canvas.height);
+        syncCalibrationBeat();
+        return;
+      }
       if (!inKeyMap) return;
       const ratio = devicePixelRatio || 1;
       Module._piu_keymap_click(event.offsetX * ratio, event.offsetY * ratio, canvas.width, canvas.height);
@@ -791,6 +862,14 @@
 
     function onKey(event, down) {
       if (down && audioContext.state === "suspended") audioContext.resume();
+      if (inCalibration) {
+        event.preventDefault();
+        if (down && !event.repeat) {
+          if (event.code === "Escape") Module._piu_calibration_cancel();
+          else Module._piu_calibration_tap(event.timeStamp);
+        }
+        return;
+      }
       if (inKeyMap) {
         event.preventDefault();
         if (down && !event.repeat) withString(event.code, p => Module._piu_keymap_key(p));
@@ -843,7 +922,14 @@
         const result = Module._piu_keymap_finished();
         if (result) closeKeyMap(result);
       }
-      Module._piu_frame(now, playing && hasAudio && !audio.paused ? audio.currentTime * 1000 : -1, width, height);
+      if (inCalibration) {
+        syncCalibrationBeat();
+        const result = Module._piu_calibration_finished();
+        if (result) closeCalibration(result);
+      }
+      const beatPlaying = inCalibration && calibrationBeating && !audio.paused;
+      const songPlaying = playing && hasAudio && !audio.paused;
+      Module._piu_frame(now, beatPlaying || songPlaying ? audio.currentTime * 1000 : -1, width, height);
       for (let code; (code = Module._piu_next_sound()) >= 0;) playSound(code);
       if (playing && Module._piu_take_audio_stop()) audio.pause();
       if (inDemo) { if (Module._piu_finished()) endDemo(); }

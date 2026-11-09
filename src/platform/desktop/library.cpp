@@ -187,6 +187,7 @@ Settings load_settings() {
     settings.fullscreen = fullscreen->number() != 0.0;
   }
   if (const Json* keys = root->find("keys"); keys != nullptr) settings.keys = keys->string();
+  if (const Json* offset = root->find("audioOffset"); offset != nullptr) settings.audio_offset_ms = static_cast<int>(offset->number());
   if (const Json* machine = root->find("machine"); machine != nullptr && machine->items().size() == 6) {
     std::array<int, 6> values{};
     for (std::size_t i = 0; i < values.size(); ++i) values[i] = static_cast<int>(machine->items()[i].number());
@@ -200,6 +201,7 @@ bool save_settings(const Settings& settings) {
   text << "{\"language\":" << quoted(settings.language) << ",\"wide\":" << (settings.wide ? 1 : 0)
        << ",\"fullscreen\":" << (settings.fullscreen ? 1 : 0);
   if (!settings.keys.empty()) text << ",\"keys\":" << quoted(settings.keys);
+  if (settings.audio_offset_ms != 0) text << ",\"audioOffset\":" << settings.audio_offset_ms;
   if (settings.machine) {
     text << ",\"machine\":[";
     for (std::size_t i = 0; i < settings.machine->size(); ++i) text << (i == 0 ? "" : ",") << (*settings.machine)[i];

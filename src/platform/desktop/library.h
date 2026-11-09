@@ -18,6 +18,8 @@ struct Settings {
   bool fullscreen = false;
   // The key of each input, as KeyMap saves it. Empty means the default layout.
   std::string keys;
+  // How late, in ms, the player hears the music.
+  int audio_offset_ms = 0;
   // The machine's EEPROM: mode, difficulty, stage break, help, demo sound, coins.
   std::optional<std::array<int, 6>> machine;
 };

@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace piu::desktop {
@@ -25,6 +26,8 @@ class Audio {
   void stop_sounds();
 
   bool play_music(const std::filesystem::path& path, bool loop = false);
+  // The same, from a WAV file already in memory.
+  bool play_music_data(const std::string& wav, bool loop);
   void pause_music();
   void stop_music();
   // Song position in milliseconds, or negative if no music is playing.
@@ -46,6 +49,7 @@ class Audio {
 
   static void fill(void* self, Uint8* out, int bytes);
   void mix(std::int16_t* out, int frames);
+  bool start_music(std::shared_ptr<const Sample> sample, bool loop);
   void mix_voice(Voice& voice, std::int32_t* out, int frames);
 
   static constexpr int kVoices = 16;
