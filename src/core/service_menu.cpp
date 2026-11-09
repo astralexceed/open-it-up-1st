@@ -34,9 +34,8 @@ constexpr int kEffects = 0x25;
 
 const std::string kMainRows[7] = {"I/O TEST",    "EEPROM TEST", "SCREEN TEST", "GAME OPTION",
                                   "COIN OPTION", "SOUND TEST",  "EXIT"};
-// A choice of the port: the machine also lists CLEAR RANKING here, but it has no ranking to clear.
-const std::string kGameRows[8] = {"GAME MODE",       "DIFFICULTY",    "STAGE BREAK", "SHOW HELP",
-                                  "DEMO SOUND",      "DEFAULT SETTING", "SAVE AND EXIT", "EXIT"};
+const std::string kGameRows[9] = {"GAME MODE",  "DIFFICULTY",      "STAGE BREAK",   "SHOW HELP", "DEMO SOUND",
+                                  "DEFAULT SETTING", "CLEAR RANKING", "SAVE AND EXIT", "EXIT"};
 const std::string kCoinRows[4] = {"COIN SETTING", "DEFAULT SETTING", "SAVE AND EXIT", "EXIT"};
 const std::string kSoundRows[3] = {"CD", "EFFECT", "EXIT"};
 
@@ -70,7 +69,7 @@ ServiceMenu::ServiceMenu(MachineSettings settings, const Assets& assets) : setti
 int ServiceMenu::rows() const {
   switch (page_) {
     case Page::kMain: return 7;
-    case Page::kGame: return 8;
+    case Page::kGame: return 9;
     case Page::kCoin: return 4;
     case Page::kSound: return 3;
     default: return 0;
@@ -127,10 +126,13 @@ void ServiceMenu::select_game_option() {
     case 4: cycle(settings_.demo_sound, 2); break;
     case 5: settings_.restore_game_defaults(); break;
     case 6:
+      // CLEAR RANKING: the machine erases a ranking that the game never shows, so nothing changes on screen.
+      break;
+    case 7:
       saved_ = settings_;
       page_ = Page::kMain;
       break;
-    case 7:
+    case 8:
       reload();
       page_ = Page::kMain;
       break;
@@ -277,11 +279,11 @@ void ServiceMenu::draw_eeprom(DrawList& out) const {
   // Saved settings go through the browser, so the test always passes.
   const std::string pattern = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   text(out, kLabelX, 0x96, "WRITE ........", Align::kLeft, kWhite);
-  text(out, kEepromValueX, 0x96, pattern, Align::kLeft, kWhite);
+  text(out, kEepromValueX, 0x96, pattern, Align::kLeft, kYellow);
   text(out, kLabelX, 0xb4, "READ  ........", Align::kLeft, kWhite);
-  text(out, kEepromValueX, 0xb4, pattern, Align::kLeft, kWhite);
+  text(out, kEepromValueX, 0xb4, pattern, Align::kLeft, kYellow);
   text(out, kLabelX, 0xd2, "CHECK ........", Align::kLeft, kWhite);
-  text(out, kEepromValueX, 0xd2, "SUCCESS", Align::kLeft, kWhite);
+  text(out, kEepromValueX, 0xd2, "SUCCESS", Align::kLeft, kYellow);
   draw_exit_hint(out);
   draw_title(out, "EEPROM TEST");
 }
@@ -311,7 +313,7 @@ void ServiceMenu::draw_screen_test(DrawList& out) const {
 }
 
 void ServiceMenu::draw_game(DrawList& out) const {
-  draw_list_rows(out, kGameRows, 8, kLabelX, Align::kLeft);
+  draw_list_rows(out, kGameRows, 9, kLabelX, Align::kLeft);
   const auto value = [&](int row, const char* label) {
     text(out, kValueX, kFirstRowY + kRowStep * static_cast<float>(row), label, Align::kLeft, kWhite);
   };

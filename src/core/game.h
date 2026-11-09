@@ -59,6 +59,8 @@ struct GameOptions {
   bool double_play = false;
   // Replaces the BGA with the 3D flight when set.
   const Scene* flight = nullptr;
+  // Where the 3D flight is. The machine sets it once at power-on, so it carries over between songs.
+  int* flight_counter = nullptr;
   // Machine difficulty setting: 0 easy, 1 normal, 2 hard.
   int machine_difficulty = 0;
   // STAGE BREAK setting: 0 to 2. A stage can be failed from stage_break + 1 on.
@@ -241,7 +243,9 @@ class Game {
   std::array<ReceptorSet, 2> drawn_receptors_{};
   std::array<JudgmentFx, 2> judgment_{};
   std::array<JudgmentFx, 2> drawn_judgment_{};
-  int flight_counter_ = 0;
+  int own_flight_counter_ = 0;
+  int& flight_counter() { return options_.flight_counter != nullptr ? *options_.flight_counter : own_flight_counter_; }
+  int flight_counter() const { return options_.flight_counter != nullptr ? *options_.flight_counter : own_flight_counter_; }
   int danger_frames_ = 0;
   int grace_rows_ = 0;
   int flicker_frame_ = 0;

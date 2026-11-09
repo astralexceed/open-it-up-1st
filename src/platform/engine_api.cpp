@@ -39,6 +39,7 @@ struct Engine {
   piu::FixedClock calibration_clock;
   bool calibration_clock_running = false;
   int audio_offset_ms = 0;
+  int flight_counter = 0;
   piu::Texture key_map_atlas;
   std::string key_map_text;
   piu::GlRenderer renderer;
@@ -137,7 +138,11 @@ PIU_EXPORT void piu_coin_configure(int per_credit, int free_play) {
   engine->coins.configure(per_credit, free_play != 0);
 }
 PIU_EXPORT void piu_coin_add(int credits) { engine->coins.add_credits(credits); }
-PIU_EXPORT void piu_coin_reset() { engine->coins.reset(); }
+// The machine was turned off: credits and the place in the 3D flight start over.
+PIU_EXPORT void piu_coin_reset() {
+  engine->coins.reset();
+  engine->flight_counter = 0;
+}
 PIU_EXPORT void piu_coin_insert() {
   engine->coin_sounds.play(engine->coins.next_coin_sound(), 0);
   engine->coins.insert();
@@ -164,6 +169,7 @@ PIU_EXPORT int piu_begin(int p1_word, int p2_word, int margin, int double_play, 
   options.life_level = life_level;
   options.double_play = double_play != 0;
   options.flight = flight;
+  options.flight_counter = &engine->flight_counter;
   options.machine_difficulty = engine->settings.difficulty;
   options.stage_break = engine->settings.stage_break;
   options.coins = &engine->coins;

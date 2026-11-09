@@ -709,7 +709,7 @@ void Game::run_frame() {
 
   // The camera advances one key every second frame.
   if (options_.flight != nullptr && !hide_playfield_) {
-    if (++flight_counter_ > static_cast<int>(options_.flight->camera.size()) * 2) flight_counter_ = 0;
+    if (++flight_counter() > static_cast<int>(options_.flight->camera.size()) * 2) flight_counter() = 0;
   }
 
   ++flicker_frame_;
@@ -746,7 +746,7 @@ bool Game::finished() const {
 void Game::draw_bga(DrawList& out, double seconds) const {
   if (options_.flight != nullptr) {
     const int last = static_cast<int>(options_.flight->camera.size()) - 1;
-    const int frame = std::clamp(flight_counter_ / 2, 0, last);
+    const int frame = std::clamp(flight_counter() / 2, 0, last);
     out.set_scene(options_.flight, scene_matrix(options_.flight->camera[static_cast<std::size_t>(frame)]),
                   scene_base_model(frame));
     return;

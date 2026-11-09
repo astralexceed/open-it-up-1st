@@ -59,7 +59,7 @@ void main() {
   // Black fog: a straight line in depth that reaches black at 4/5 of the far plane.
   float fog = clamp(1.0 - v_depth / 12.8, 0.0, 1.0);
   // A choice of the port: 85% keeps the flight from competing with the arrows.
-  gl_FragColor = vec4(color.rgb * 0.85 * fog, color.a);
+  gl_FragColor = vec4(color.rgb * 0.90 * fog, color.a);
 }
 )";
 
