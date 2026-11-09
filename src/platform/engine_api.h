@@ -43,6 +43,21 @@ PIU_EXPORT void piu_keymap_click(double px, double py, int width, int height);
 PIU_EXPORT int piu_keymap_finished();
 PIU_EXPORT const char* piu_keymap_result();
 PIU_EXPORT void piu_keymap_close();
+
+// The audio calibration screen. The first two give the WAV file with its beat.
+PIU_EXPORT const char* piu_calibration_track();
+PIU_EXPORT int piu_calibration_track_size();
+PIU_EXPORT void piu_calibration_open(int current_ms, int spanish);
+PIU_EXPORT void piu_calibration_tap(double time_ms);
+PIU_EXPORT void piu_calibration_cancel();
+PIU_EXPORT void piu_calibration_click(double px, double py, int width, int height);
+PIU_EXPORT int piu_calibration_wants_audio();
+// 0 running, 1 saved, 2 cancelled.
+PIU_EXPORT int piu_calibration_finished();
+PIU_EXPORT int piu_calibration_result();
+PIU_EXPORT void piu_calibration_close();
+// How late, in ms, the player hears the music. The arrows wait that long.
+PIU_EXPORT void piu_set_audio_offset(int ms);
 PIU_EXPORT int piu_frame_due(double now_ms);
 PIU_EXPORT void piu_frame(double now_ms, double audio_ms, int width, int height);
 PIU_EXPORT void piu_settings_load(int mode, int difficulty, int stage_break, int help, int demo, int coins);

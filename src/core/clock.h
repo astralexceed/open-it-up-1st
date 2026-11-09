@@ -51,6 +51,9 @@ class FixedClock {
     return static_cast<std::int64_t>(std::floor(ticks_since_origin(ms)));
   }
 
+  // Position of the song at an event timestamp from the same clock.
+  double song_ms_at(double ms) const { return ms - origin_ms_; }
+
   // Fraction of a tick elapsed since the last step, for smooth drawing.
   double alpha() const { return alpha_; }
   std::int64_t ticks() const { return done_; }

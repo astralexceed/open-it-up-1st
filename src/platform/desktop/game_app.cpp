@@ -129,6 +129,7 @@ class GameApp {
  public:
   GameExit run();
   GameExit run_key_map();
+  GameExit run_calibration();
 
  private:
   enum class Flow { kNone, kHelp, kSelect, kGame };
@@ -136,6 +137,7 @@ class GameApp {
   bool start_video();
   void claim_focus();
   bool create_window(const Settings& settings, int width, int height);
+  double input_time_ = 0.0;
   double now() const;
   bool load_flow();
   void restore_machine_settings();
@@ -517,7 +519,7 @@ void GameApp::release_held() {
 
 void GameApp::handle_key(const SDL_KeyboardEvent& key, bool down) {
   const SDL_Scancode code = key.keysym.scancode;
-  const double time = static_cast<double>(key.timestamp);
+  const double time = input_time_;
   const int action = keys_.action_for(key_code(code));
   if (action == kKeyTest && down && key.repeat == 0 && !in_service_) {
     if (in_attract_) {
@@ -643,6 +645,67 @@ GameExit GameApp::run_key_map() {
   return GameExit::kBackToLauncher;
 }
 
+GameExit GameApp::run_calibration() {
+  if (!start_video()) return GameExit::kFailed;
+  settings_ = load_settings();
+  Settings windowed = settings_;
+  windowed.fullscreen = false;
+  if (!create_window(windowed, 640, 480) || piu_engine_start() == 0) {
+    SDL_Quit();
+    return GameExit::kFailed;
+  }
+  audio_.open();
+  piu_calibration_open(settings_.audio_offset_ms, settings_.language == "es" ? 1 : 0);
+  const std::string track(piu_calibration_track(), static_cast<std::size_t>(piu_calibration_track_size()));
+
+  bool beating = false;
+  double last_poll = now();
+  while (piu_calibration_finished() == 0) {
+    claim_focus();
+    const double polled_at = now();
+    const double pressed_at = (last_poll + polled_at) / 2.0;
+    last_poll = polled_at;
+    SDL_Event event;
+    while (SDL_PollEvent(&event) != 0) {
+      if (event.type == SDL_QUIT) {
+        audio_.close();
+        SDL_Quit();
+        return GameExit::kQuit;
+      }
+      if (event.type == SDL_KEYDOWN && event.key.repeat == 0) {
+        if (event.key.keysym.scancode == SDL_SCANCODE_ESCAPE) piu_calibration_cancel();
+        else piu_calibration_tap(pressed_at);
+      } else if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+        int width = 1;
+        int height = 1;
+        SDL_GetWindowSize(window_, &width, &height);
+        piu_calibration_click(event.button.x, event.button.y, width, height);
+      }
+    }
+    const bool wanted = piu_calibration_wants_audio() != 0;
+    if (wanted && !beating) audio_.play_music_data(track, true);
+    if (!wanted && beating) audio_.stop_music();
+    beating = wanted;
+    if (piu_frame_due(now()) == 0) {
+      SDL_Delay(1);
+      continue;
+    }
+    int width = 1;
+    int height = 1;
+    SDL_GL_GetDrawableSize(window_, &width, &height);
+    const double time = now();
+    piu_frame(time, beating ? audio_.music_ms(time) : -1.0, std::max(1, width), std::max(1, height));
+    SDL_GL_SwapWindow(window_);
+  }
+  if (piu_calibration_finished() == 1) {
+    settings_.audio_offset_ms = piu_calibration_result();
+    save_settings(settings_);
+  }
+  audio_.close();
+  SDL_Quit();
+  return GameExit::kBackToLauncher;
+}
+
 GameExit GameApp::run() {
   if (!start_video()) return GameExit::kFailed;
 
@@ -665,11 +728,18 @@ GameExit GameApp::run() {
   restore_machine_settings();
   apply_machine_settings();
   piu_set_wide(settings_.wide ? 1 : 0);
+  piu_set_audio_offset(settings_.audio_offset_ms);
 
   if (!start_attract()) return fail("The extraction is incomplete. Choose the CHD again.");
 
+  double last_poll = now();
   while (running_) {
     claim_focus();
+    // Keys are only seen here, and waiting for the display can take a whole frame. A key
+    // read now was pressed at some point since the last look; the midpoint removes the delay.
+    const double polled_at = now();
+    input_time_ = (last_poll + polled_at) / 2.0;
+    last_poll = polled_at;
     SDL_Event event;
     while (SDL_PollEvent(&event) != 0) {
       if (event.type == SDL_QUIT) running_ = false;
@@ -697,6 +767,11 @@ GameExit GameApp::run() {
 GameExit run_game() {
   GameApp app;
   return app.run();
+}
+
+GameExit run_calibration() {
+  GameApp app;
+  return app.run_calibration();
 }
 
 GameExit run_key_map() {

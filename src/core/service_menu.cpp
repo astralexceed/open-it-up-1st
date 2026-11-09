@@ -187,10 +187,19 @@ void ServiceMenu::text(DrawList& out, float x, float y, const std::string& value
   // 32 columns by 16 rows of 8x16 glyphs.
   for (char c : value) {
     const auto code = static_cast<unsigned char>(c);
-    const auto u0 = static_cast<float>(code % 32) / 32.0f;
-    const auto v0 = static_cast<float>(code / 32) / 16.0f;
-    const float u1 = u0 + 1.0f / 32.0f;
-    const float v1 = v0 + 1.0f / 16.0f;
+    // In texels first, so that a scaled glyph does not pick up the edge of the next one.
+    const auto cell_w = static_cast<float>(font_.width) / 32.0f;
+    const auto cell_h = static_cast<float>(font_.height) / 16.0f;
+    float u0 = static_cast<float>(code % 32) * cell_w;
+    float v0 = static_cast<float>(code / 32) * cell_h;
+    float u1 = u0 + cell_w;
+    float v1 = v0 + cell_h;
+    inset_texels(u0, u1);
+    inset_texels(v0, v1);
+    u0 /= static_cast<float>(font_.width);
+    u1 /= static_cast<float>(font_.width);
+    v0 /= static_cast<float>(font_.height);
+    v1 /= static_cast<float>(font_.height);
     out.quad(font_.id, {x, y, u0, v0, color}, {x + kGlyphAdvance, y, u1, v0, color},
              {x + kGlyphAdvance, y + kGlyphHeight, u1, v1, color}, {x, y + kGlyphHeight, u0, v1, color});
     x += kGlyphAdvance;

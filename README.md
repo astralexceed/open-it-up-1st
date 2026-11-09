@@ -93,6 +93,10 @@ On some Macs the `F` keys need `Fn`. Game keys do not work in the launcher.
 
 To change them, open **Additional settings > Map controls** in the launcher. Click a panel, coin or service button, press the key you want, and press **Save** when you are done. A key cannot be used for two things. **Reset** restores the defaults, and `Esc` cancels. `Esc` cannot be assigned.
 
+### Audio calibration
+
+If the music feels out of step with the arrows, open **Additional settings > Calibrate audio** in the launcher. Listen to the beat, press any key on each one 20 times, and press **Save**. The arrows then wait for what you actually hear. It does not change the game's rules or timing windows. Calibrate again if you change speakers or headphones. **Set to 0** turns it off.
+
 ### Life and grades
 
 You clear the song if your life is still up and you missed no more than half of the rows. With the default setting, you cannot be cut off mid-song on Stage 1. From the stage set by STAGE BREAK onward, the game ends if your life stays at the minimum long enough.
@@ -161,5 +165,7 @@ X2 and X4 together give X3.
 This is a fan project with no affiliation with Andamiro or the Pump It Up rights holders. Trademarks and game content belong to their respective owners. Only use files obtained from a legal backup of your own copy.
 
 ## Thanks
+
+The setup screens use the [Inter](https://github.com/rsms/inter) typeface, under the [SIL Open Font License](assets/fonts/OFL-Inter.txt).
 
 To the whole Pump It Up community: to everyone who has kept the machines alive, documented the game and kept dancing for more than 25 years. This is for you. We hope you enjoy it.

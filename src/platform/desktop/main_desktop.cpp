@@ -35,6 +35,11 @@ int main(int argc, char** argv) {
       if (result == GameExit::kBackToLauncher) open_application(Start::kLauncher);
       return result == GameExit::kFailed ? 1 : 0;
     }
+    if (std::strcmp(argv[i], "--calibrate") == 0) {
+      const GameExit result = run_calibration();
+      if (result == GameExit::kBackToLauncher) open_application(Start::kLauncher);
+      return result == GameExit::kFailed ? 1 : 0;
+    }
     if (std::strcmp(argv[i], "--extract") == 0 && i + 1 < argc) return report(extract_game(argv[i + 1], nullptr));
     if (std::strcmp(argv[i], "--sounds") == 0 && i + 1 < argc) return report(extract_sounds(argv[i + 1], nullptr));
   }

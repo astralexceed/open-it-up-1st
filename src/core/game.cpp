@@ -892,7 +892,8 @@ void Game::draw_judgment(DrawList& out, int lane) const {
     const int frame = digit - '0';
     const auto u0 = static_cast<float>(64 * (frame % 4));
     const auto v0 = static_cast<float>(64 * (frame / 4));
-    emit_quad(out, combo_digits_, x, y, 64.0f, 64.0f, u0, v0, u0 + 64.0f, v0 + 64.0f, kIdentity, color, 0);
+    // The whole cell, less its last row and column, goes into the tile.
+    emit_quad(out, combo_digits_, x, y, 64.0f, 64.0f, u0, v0, u0 + 63.0f, v0 + 63.0f, kIdentity, color, 0);
     x += kComboDigitStep;
   }
 }
@@ -906,7 +907,8 @@ void Game::draw_score(DrawList& out, int lane) const {
     const int frame = digit - '0';
     const auto u0 = static_cast<float>(32 * (frame % 8));
     const auto v0 = static_cast<float>(39 * (frame / 8));
-    emit_quad(out, score_digits_, x, kScoreDigitY, 32.0f, 35.0f, u0, v0, u0 + 32.0f, v0 + 35.0f, kIdentity, white, 0);
+    // The whole 32x39 cell, less its last row and column, is squeezed into the 32x35 tile.
+    emit_quad(out, score_digits_, x, kScoreDigitY, 32.0f, 35.0f, u0, v0, u0 + 31.0f, v0 + 38.0f, kIdentity, white, 0);
     x += kScoreDigitStep;
   }
 }

@@ -10,6 +10,8 @@
 #include <vector>
 
 #include "core/key_map_screen.h"
+#include "core/ui_atlas.h"
+#include "core/calibration_screen.h"
 #include "core/frame_limiter.h"
 #include "core/assets.h"
 #include "core/clock.h"
@@ -571,6 +573,77 @@ void test_display_swap_interval() {
   check(piu::display_swap_interval(0) == 1, "sin dato espera un refresco");
 }
 
+void test_calibration() {
+  std::vector<double> taps(16, 37.0);
+  piu::TapMeasure steady = piu::measure_taps(taps);
+  check(steady.offset_ms == 37 && steady.steady, "toques iguales dan su promedio");
+
+  // Around the seam of the beat: 595 and 5 are 10 ms apart, and their center is 0.
+  taps.clear();
+  for (int i = 0; i < 8; ++i) {
+    taps.push_back(595.0);
+    taps.push_back(5.0);
+  }
+  steady = piu::measure_taps(taps);
+  check(std::abs(steady.offset_ms) <= 1 && steady.steady, "promedia a traves del final del beat");
+
+  taps.assign(16, 10.0);
+  taps[0] = 280.0;
+  taps[1] = 250.0;
+  steady = piu::measure_taps(taps);
+  check(near(steady.offset_ms, 10, 1) && steady.steady, "descarta los toques sueltos");
+
+  taps.clear();
+  for (int i = 0; i < 16; ++i) taps.push_back(i * 12.0);
+  check(!piu::measure_taps(taps).steady, "toques irregulares no se aceptan");
+
+  taps.assign(16, 590.0);
+  check(piu::measure_taps(taps).offset_ms == -10, "tocar antes del beat da negativo");
+  taps.assign(16, 299.0);
+  check(piu::measure_taps(taps).offset_ms == 299, "mide retrasos grandes");
+
+  const std::string wav = piu::make_click_track();
+  check(wav.compare(0, 4, "RIFF") == 0 && wav.size() == 44 + 40 * 26460 * 2, "pista del beat");
+  const auto sample = [&](std::size_t frame) {
+    return static_cast<std::int16_t>(static_cast<unsigned char>(wav[44 + frame * 2]) |
+                                     static_cast<unsigned char>(wav[45 + frame * 2]) << 8);
+  };
+  check(std::abs(sample(6)) > 3000 && std::abs(sample(26460 + 6)) > 3000, "un golpe en cada beat");
+  check(sample(13000) == 0, "silencio entre golpes");
+
+  const piu::Texture none;
+  piu::CalibrationScreen screen(25, false, none);
+  check(screen.wants_audio(), "el beat suena al abrir");
+  screen.tap(-5.0);
+  for (int i = 0; i < 4; ++i) screen.tap(i * piu::kCalibrationBeatMs + 200.0);
+  for (int i = 4; i < 19; ++i) screen.tap(i * piu::kCalibrationBeatMs + 40.0);
+  check(screen.wants_audio(), "falta un toque");
+  screen.click(500.0f, 440.0f);
+  check(screen.result() == piu::CalibrationScreen::Result::kRunning, "no se guarda antes de terminar");
+  screen.tap(19 * piu::kCalibrationBeatMs + 40.0);
+  check(!screen.wants_audio(), "el beat para al terminar");
+  check(screen.offset_ms() == 25, "aun no cambia lo guardado");
+  screen.click(500.0f, 440.0f);
+  check(screen.result() == piu::CalibrationScreen::Result::kSaved && screen.offset_ms() == 40, "guarda sin el calentamiento");
+
+  piu::CalibrationScreen again(25, false, none);
+  for (int i = 0; i < 20; ++i) again.tap(i * piu::kCalibrationBeatMs + i * 12.0);
+  again.click(500.0f, 440.0f);
+  check(again.result() == piu::CalibrationScreen::Result::kRunning, "irregular no se puede guardar");
+  again.click(320.0f, 440.0f);
+  check(again.wants_audio(), "repetir vuelve a sonar");
+  again.click(100.0f, 440.0f);
+  check(again.result() == piu::CalibrationScreen::Result::kSaved && again.offset_ms() == 0, "poner en cero");
+
+  piu::CalibrationScreen left(25, false, none);
+  left.cancel();
+  check(left.result() == piu::CalibrationScreen::Result::kCancelled && left.offset_ms() == 25, "cancelar conserva");
+
+  piu::FixedClock clock;
+  clock.start(1000.0, 200.0);
+  check(near(clock.song_ms_at(1100.0), 300.0, 1e-9), "posicion de la cancion");
+}
+
 void test_coins() {
   piu::CoinBox box;
   check(box.coins_per_credit() == 5 && box.text() == "0", "por defecto 5 monedas");
@@ -930,8 +1003,11 @@ void test_key_map() {
   piu::KeyMapScreen other(keys, false, atlas);
   other.press_key("Escape");
   check(other.result() == piu::KeyMapScreen::Result::kCancelled, "Esc sale sin guardar");
-  const piu::KeyMapAtlas pixels = piu::make_key_map_atlas();
+  const piu::UiAtlas pixels = piu::make_ui_atlas();
   check(pixels.rgba.size() == static_cast<std::size_t>(pixels.width) * pixels.height * 4, "atlas completo");
+  check(piu::ui::text_width("Map controls", 14.0f) > 40.0f, "el texto tiene ancho");
+  check(piu::ui::text_width("Map controls", 22.0f) > piu::ui::text_width("Map controls", 14.0f), "crece con el tamano");
+  check(piu::ui::text_width("Gu\xC3\xAD" "ate", 14.0f) > piu::ui::text_width("Guate", 14.0f), "letras con acento");
 }
 
 void test_second_player_turns_double_into_battle() {
@@ -1584,6 +1660,7 @@ int main() {
   test_coins();
   test_frame_limiter_holds_60_fps();
   test_display_swap_interval();
+  test_calibration();
   test_results_screen();
   test_ending_clip_time();
   test_stage_break();

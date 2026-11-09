@@ -15,7 +15,9 @@ extern char** environ;
 
 namespace {
 
-constexpr CGFloat kContentWidth = 440;
+constexpr CGFloat kColumnWidth = 400;
+constexpr CGFloat kColumnGap = 48;
+constexpr CGFloat kContentWidth = kColumnWidth * 2 + kColumnGap;
 
 NSDictionary<NSString*, NSDictionary<NSString*, NSString*>*>* Texts() {
   static NSDictionary* texts = @{
@@ -40,6 +42,7 @@ NSDictionary<NSString*, NSDictionary<NSString*, NSString*>*>* Texts() {
       @"displayWindowed" : @"Windowed",
       @"displayFullscreen" : @"Fullscreen",
       @"mapControls" : @"Map controls",
+      @"calibrateAudio" : @"Calibrate audio",
       @"launch" : @"Launch game",
       @"chooseChd" : @"Choose CHD file",
       @"changeChd" : @"Change CHD file",
@@ -79,6 +82,7 @@ NSDictionary<NSString*, NSDictionary<NSString*, NSString*>*>* Texts() {
       @"displayWindowed" : @"Ventana",
       @"displayFullscreen" : @"Pantalla completa",
       @"mapControls" : @"Mapear controles",
+      @"calibrateAudio" : @"Calibrar audio",
       @"launch" : @"Lanzar juego",
       @"chooseChd" : @"Elegir archivo CHD",
       @"changeChd" : @"Cambiar archivo CHD",
@@ -111,7 +115,9 @@ NSColor* Warning() { return [NSColor colorWithSRGBRed:1.0 green:0x8a / 255.0 blu
 
 @implementation PiuLauncher {
   NSWindow* _window;
+  NSStackView* _root;
   NSStackView* _stack;
+  CGFloat _width;
   NSMutableArray<NSTextField*>* _translated;
   NSTextField* _status;
   NSTextField* _soundStatus;
@@ -120,6 +126,7 @@ NSColor* Warning() { return [NSColor colorWithSRGBRed:1.0 green:0x8a / 255.0 blu
   NSButton* _addSounds;
   NSButton* _launch;
   NSButton* _mapKeys;
+  NSButton* _calibrate;
   NSPopUpButton* _aspect;
   NSPopUpButton* _language;
   NSPopUpButton* _display;
@@ -140,8 +147,8 @@ NSColor* Warning() { return [NSColor colorWithSRGBRed:1.0 green:0x8a / 255.0 blu
   NSTextField* label = [NSTextField wrappingLabelWithString:@""];
   label.selectable = NO;
   label.font = bold ? [NSFont boldSystemFontOfSize:size] : [NSFont systemFontOfSize:size];
-  label.preferredMaxLayoutWidth = kContentWidth;
-  [label.widthAnchor constraintEqualToConstant:kContentWidth].active = YES;
+  label.preferredMaxLayoutWidth = _width;
+  [label.widthAnchor constraintEqualToConstant:_width].active = YES;
   if (key != nil) {
     label.identifier = key;
     [_translated addObject:label];
@@ -154,14 +161,14 @@ NSColor* Warning() { return [NSColor colorWithSRGBRed:1.0 green:0x8a / 255.0 blu
   NSBox* line = [[NSBox alloc] initWithFrame:NSZeroRect];
   line.boxType = NSBoxSeparator;
   [_stack addArrangedSubview:line];
-  [line.widthAnchor constraintEqualToConstant:kContentWidth].active = YES;
+  [line.widthAnchor constraintEqualToConstant:_width].active = YES;
   [line.heightAnchor constraintEqualToConstant:1].active = YES;
 }
 
 - (NSButton*)addButtonWithAction:(SEL)action {
   NSButton* button = [NSButton buttonWithTitle:@"" target:self action:action];
   [_stack addArrangedSubview:button];
-  [button.widthAnchor constraintEqualToConstant:kContentWidth].active = YES;
+  [button.widthAnchor constraintEqualToConstant:_width].active = YES;
   return button;
 }
 
@@ -172,7 +179,7 @@ NSColor* Warning() { return [NSColor colorWithSRGBRed:1.0 green:0x8a / 255.0 blu
   popup.target = self;
   popup.action = action;
   [_stack addArrangedSubview:popup];
-  [popup.widthAnchor constraintEqualToConstant:kContentWidth].active = YES;
+  [popup.widthAnchor constraintEqualToConstant:_width].active = YES;
   return popup;
 }
 
@@ -182,14 +189,21 @@ NSColor* Warning() { return [NSColor colorWithSRGBRed:1.0 green:0x8a / 255.0 blu
   [popup selectItemAtIndex:selected];
 }
 
+- (NSStackView*)newColumn {
+  NSStackView* column = [[NSStackView alloc] initWithFrame:NSZeroRect];
+  column.orientation = NSUserInterfaceLayoutOrientationVertical;
+  column.alignment = NSLayoutAttributeLeading;
+  column.spacing = 12;
+  return column;
+}
+
 - (void)buildWindow {
   _translated = [NSMutableArray array];
-  _stack = [[NSStackView alloc] initWithFrame:NSZeroRect];
-  _stack.orientation = NSUserInterfaceLayoutOrientationVertical;
-  _stack.alignment = NSLayoutAttributeLeading;
-  _stack.spacing = 8;
-  _stack.edgeInsets = NSEdgeInsetsMake(20, 20, 20, 20);
-  _stack.translatesAutoresizingMaskIntoConstraints = NO;
+  _root = [self newColumn];
+  _root.edgeInsets = NSEdgeInsetsMake(36, 36, 36, 36);
+  _root.translatesAutoresizingMaskIntoConstraints = NO;
+  _stack = _root;
+  _width = kContentWidth;
 
   NSTextField* title = [self labelForKey:nil size:24 bold:YES];
   NSMutableAttributedString* name = [[NSMutableAttributedString alloc] initWithString:@"Open It UP: 1st Preservation"];
@@ -199,6 +213,17 @@ NSColor* Warning() { return [NSColor colorWithSRGBRed:1.0 green:0x8a / 255.0 blu
   title.attributedStringValue = name;
 
   [self addSeparator];
+
+  NSStackView* left = [self newColumn];
+  NSStackView* right = [self newColumn];
+  NSStackView* columns = [NSStackView stackViewWithViews:@[ left, right ]];
+  columns.orientation = NSUserInterfaceLayoutOrientationHorizontal;
+  columns.alignment = NSLayoutAttributeTop;
+  columns.spacing = kColumnGap;
+  [_root addArrangedSubview:columns];
+  _stack = left;
+  _width = kColumnWidth;
+
   [self labelForKey:@"instructions" size:13 bold:YES];
   [self labelForKey:@"loadOriginals" size:13 bold:NO];
   [self labelForKey:@"chdUse" size:13 bold:NO];
@@ -214,7 +239,7 @@ NSColor* Warning() { return [NSColor colorWithSRGBRed:1.0 green:0x8a / 255.0 blu
   _progress.maxValue = 100;
   _progress.hidden = YES;
   [_stack addArrangedSubview:_progress];
-  [_progress.widthAnchor constraintEqualToConstant:kContentWidth].active = YES;
+  [_progress.widthAnchor constraintEqualToConstant:_width].active = YES;
   _chooseChd = [self addButtonWithAction:@selector(chooseChd:)];
   _addSounds = [self addButtonWithAction:@selector(addSounds:)];
   _soundStatus = [self labelForKey:nil size:12 bold:NO];
@@ -222,18 +247,19 @@ NSColor* Warning() { return [NSColor colorWithSRGBRed:1.0 green:0x8a / 255.0 blu
   [self labelForKey:@"extractNote" size:12 bold:NO].textColor = NSColor.secondaryLabelColor;
   [self labelForKey:@"legalNote" size:12 bold:NO].textColor = NSColor.secondaryLabelColor;
 
-  [self addSeparator];
+  _stack = right;
   [self labelForKey:@"additionalSettings" size:13 bold:YES];
   _aspect = [self addPopupForKey:@"aspectRatio" action:@selector(settingChanged:)];
   _language = [self addPopupForKey:@"menuLanguage" action:@selector(languageChanged:)];
   _display = [self addPopupForKey:@"displayMode" action:@selector(settingChanged:)];
   _mapKeys = [self addButtonWithAction:@selector(mapKeys:)];
+  _calibrate = [self addButtonWithAction:@selector(calibrate:)];
 
   [self addSeparator];
   _launch = [self addButtonWithAction:@selector(launch:)];
   _launch.keyEquivalent = @"\r";
 
-  _window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, kContentWidth + 40, 600)
+  _window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, kContentWidth + 72, 600)
                                         styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable
                                           backing:NSBackingStoreBuffered
                                             defer:NO];
@@ -241,12 +267,12 @@ NSColor* Warning() { return [NSColor colorWithSRGBRed:1.0 green:0x8a / 255.0 blu
   _window.appearance = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
   _window.releasedWhenClosed = NO;
   NSView* content = _window.contentView;
-  [content addSubview:_stack];
+  [content addSubview:_root];
   [NSLayoutConstraint activateConstraints:@[
-    [_stack.topAnchor constraintEqualToAnchor:content.topAnchor],
-    [_stack.bottomAnchor constraintEqualToAnchor:content.bottomAnchor],
-    [_stack.leadingAnchor constraintEqualToAnchor:content.leadingAnchor],
-    [_stack.trailingAnchor constraintEqualToAnchor:content.trailingAnchor],
+    [_root.topAnchor constraintEqualToAnchor:content.topAnchor],
+    [_root.bottomAnchor constraintEqualToAnchor:content.bottomAnchor],
+    [_root.leadingAnchor constraintEqualToAnchor:content.leadingAnchor],
+    [_root.trailingAnchor constraintEqualToAnchor:content.trailingAnchor],
   ]];
 }
 
@@ -273,6 +299,8 @@ NSColor* Warning() { return [NSColor colorWithSRGBRed:1.0 green:0x8a / 255.0 blu
   _launch.title = [self text:@"launch"];
   _mapKeys.title = [self text:@"mapControls"];
   _mapKeys.enabled = !_busy;
+  _calibrate.title = [self text:@"calibrateAudio"];
+  _calibrate.enabled = !_busy;
   _soundStatus.stringValue = [self text:_state.sounds_ready ? @"soundsReady" : @"noSounds"];
   _chooseChd.enabled = !_busy;
   _addSounds.enabled = !_busy && _state.ready;
@@ -291,8 +319,8 @@ NSColor* Warning() { return [NSColor colorWithSRGBRed:1.0 green:0x8a / 255.0 blu
 
 // The window follows its content, keeping its top edge in place.
 - (void)fitWindow {
-  [_stack layoutSubtreeIfNeeded];
-  NSSize size = _stack.fittingSize;
+  [_root layoutSubtreeIfNeeded];
+  NSSize size = _root.fittingSize;
   NSRect now = _window.frame;
   NSRect next = [_window frameRectForContentRect:NSMakeRect(0, 0, size.width, size.height)];
   next.origin.x = now.origin.x;
@@ -417,6 +445,13 @@ NSColor* Warning() { return [NSColor colorWithSRGBRed:1.0 green:0x8a / 255.0 blu
   [NSApp terminate:nil];
 }
 
+- (void)calibrate:(id)sender {
+  [self storeChoices];
+  [_window orderOut:nil];
+  piu::desktop::open_application(piu::desktop::Start::kCalibration);
+  [NSApp terminate:nil];
+}
+
 @end
 
 namespace piu::desktop {
@@ -429,10 +464,11 @@ void open_application(Start start) {
     char pass_args[] = "--args";
     char play_arg[] = "--play";
     char keys_arg[] = "--keys";
+    char calibrate_arg[] = "--calibrate";
     std::vector<char*> arguments = {open_name, new_instance, bundle.data()};
     if (start != Start::kLauncher) {
       arguments.push_back(pass_args);
-      arguments.push_back(start == Start::kGame ? play_arg : keys_arg);
+      arguments.push_back(start == Start::kGame ? play_arg : start == Start::kKeyMap ? keys_arg : calibrate_arg);
     }
     arguments.push_back(nullptr);
     pid_t child = 0;

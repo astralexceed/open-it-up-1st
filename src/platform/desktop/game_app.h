@@ -10,8 +10,9 @@ enum class GameExit { kQuit, kBackToLauncher, kFailed };
 GameExit run_game();
 // The window where the player reassigns the keys.
 GameExit run_key_map();
+GameExit run_calibration();
 
-enum class Start { kLauncher, kGame, kKeyMap };
+enum class Start { kLauncher, kGame, kKeyMap, kCalibration };
 // Opens that part of the program as a new instance of the application.
 void open_application(Start start);
 

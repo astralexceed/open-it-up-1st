@@ -12,14 +12,6 @@
 
 namespace piu {
 
-// The letters and shapes of this screen, as RGBA pixels. It needs no game data.
-struct KeyMapAtlas {
-  int width = 0;
-  int height = 0;
-  std::vector<std::uint8_t> rgba;
-};
-KeyMapAtlas make_key_map_atlas();
-
 class KeyMapScreen {
  public:
   enum class Result { kRunning, kSaved, kCancelled };
@@ -43,10 +35,7 @@ class KeyMapScreen {
   static Rect target_rect(int action);
   const char* text(const char* en, const char* es) const { return spanish_ ? es : en; }
   std::string action_name(int action) const;
-  void fill(DrawList& out, const Rect& rect, Color color) const;
-  void outline(DrawList& out, const Rect& rect, Color color) const;
-  void write(DrawList& out, float x, float y, float scale, const std::string& value, Color color) const;
-  void write_centered(DrawList& out, const Rect& rect, float scale, const std::string& value, Color color) const;
+  void outline(DrawList& out, const Rect& rect, float radius, Color color) const;
   void draw_panel(DrawList& out, int action) const;
   void draw_button(DrawList& out, int action) const;
 

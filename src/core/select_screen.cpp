@@ -283,7 +283,7 @@ void SelectScreen::draw_time(DrawList& out) const {
     const int frame = value + 10;
     const auto u0 = static_cast<float>(32 * (frame % 8));
     const auto v0 = static_cast<float>(39 * (frame / 8));
-    emit_quad(out, digits_, x, 5.0f, 32.0f, 39.0f, u0, v0, u0 + 32.0f, v0 + 39.0f, kIdentity, {1, 1, 1, 1}, 0);
+    emit_quad(out, digits_, x, 5.0f, 32.0f, 39.0f, u0, v0, u0 + 31.0f, v0 + 38.0f, kIdentity, {1, 1, 1, 1}, 0);
   };
   digit(seconds / 10, 0x22c);
   digit(seconds % 10, 0x248);

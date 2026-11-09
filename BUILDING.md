@@ -100,3 +100,4 @@ The game is limited to 60 frames per second because that is how it was made, and
 | `cmake` | Building for Windows from macOS or Linux |
 | `web` | Launcher and game flow in the browser |
 | `tests` | Engine tests |
+| `tools` | Generates the font data of the setup screens |
