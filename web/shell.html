@@ -1,0 +1,882 @@
+<!doctype html>
+<!-- The web launcher, and the flow of the game in the browser: files, audio, keyboard and screens. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Open It UP: 1st Preservation</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1000 1000%22%3E%3Crect width=%221000%22 height=%221000%22 rx=%22140%22 fill=%22%231f8fff%22/%3E%3Crect x=%2285%22 y=%22260%22 width=%2290%22 height=%22100%22 fill=%22%23fff%22/%3E%3Crect x=%22175%22 y=%22260%22 width=%22100%22 height=%22480%22 fill=%22%23fff%22/%3E%3Crect x=%22330%22 y=%22260%22 width=%22270%22 height=%22100%22 fill=%22%23000%22/%3E%3Crect x=%22330%22 y=%22260%22 width=%22100%22 height=%22290%22 fill=%22%23000%22/%3E%3Crect x=%22330%22 y=%22450%22 width=%22270%22 height=%22100%22 fill=%22%23000%22/%3E%3Crect x=%22500%22 y=%22450%22 width=%22100%22 height=%22290%22 fill=%22%23000%22/%3E%3Crect x=%22330%22 y=%22640%22 width=%22270%22 height=%22100%22 fill=%22%23000%22/%3E%3Crect x=%22655%22 y=%22260%22 width=%22260%22 height=%22100%22 fill=%22%23000%22/%3E%3Crect x=%22735%22 y=%22260%22 width=%22100%22 height=%22480%22 fill=%22%23000%22/%3E%3C/svg%3E">
+<style>
+  :root { color-scheme: dark; --panel: #171528; --raised: #221f3a; --line: #352f59; --ink: #ece9f7; --soft: #a7a1c4; --yellow: #ffcf33; --sky: #87ceeb; --blue: #49b4ff; --warn: #ff8a5c; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #000; color: var(--ink); font: 14px/1.45 system-ui, sans-serif; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; outline: none; }
+  canvas.keymap { position: fixed; left: 50%; top: 50%; width: min(640px, 100vw, 133.33vh); height: min(480px, 75vw, 100vh); transform: translate(-50%, -50%); }
+  #menu { position: fixed; inset: 0; display: flex; padding: 16px; overflow: auto; }
+  #menu[hidden] { display: none; }
+  .card { width: min(440px, 100%); margin: auto; background: var(--panel); border: 1px solid var(--line); padding: 22px; display: grid; gap: 16px; }
+  h1 { font-size: 24px; margin: 0; letter-spacing: .01em; }
+  h1 span { color: var(--sky); }
+  .field { display: grid; gap: 4px; color: var(--soft); font-size: 13px; }
+  select, button, .pick { font: inherit; color: var(--ink); background: var(--raised); border: 1px solid var(--line); border-radius: 3px; padding: 8px 10px; width: 100%; }
+  .pick { display: block; text-align: center; cursor: pointer; background: var(--yellow); color: #17130a; font-weight: 700; border-color: transparent; }
+  .pick input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .pick.quiet { background: var(--raised); color: var(--ink); font-weight: 400; border-color: var(--line); }
+  .pick.busy { opacity: .5; cursor: default; }
+  .pick:focus-within, select:focus-visible, button:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+  button { cursor: pointer; }
+  #run { background: var(--blue); color: #08121c; font-weight: 700; border-color: transparent; }
+  button:disabled, select:disabled { opacity: .5; cursor: default; }
+  #status { margin: 0; color: var(--soft); font-size: 13px; min-height: 19px; white-space: pre-line; font-variant-numeric: tabular-nums; }
+  #status.warn { color: var(--warn); }
+  section { display: grid; gap: 8px; padding-top: 16px; border-top: 1px solid var(--line); }
+  section p, section ul { margin: 0; font-size: 13px; }
+  section ul { padding-left: 18px; display: grid; gap: 4px; }
+  code { color: var(--yellow); font: 12px ui-monospace, Menlo, Consolas, monospace; }
+  h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--soft); }
+  progress { width: 100%; height: 8px; accent-color: var(--yellow); }
+  progress[hidden] { display: none; }
+  .note { margin: 0; color: var(--soft); font-size: 12px; }
+</style>
+</head>
+<body>
+<canvas id="canvas" tabindex="-1"></canvas>
+<div id="menu">
+  <div class="card">
+    <h1>Open <span>It UP</span>: 1st Preservation</h1>
+    <section>
+      <h2 data-i18n="instructions"></h2>
+      <p data-i18n="loadOriginals"></p>
+      <ul>
+        <li><code>19990930.chd</code>: <span data-i18n="chdUse"></span></li>
+        <li><code>piu10.u9</code>: <span data-i18n="romUse"></span></li>
+      </ul>
+    </section>
+    <section>
+      <h2 data-i18n="fileSelection"></h2>
+      <p id="status" role="status"></p>
+      <progress id="progress" max="100" value="0" hidden></progress>
+      <label id="pick" class="pick"><span id="pickText"></span>
+        <input id="chd" type="file" accept=".chd">
+      </label>
+      <label id="pickSounds" class="pick quiet"><span id="pickSoundsText"></span>
+        <input id="sounds" type="file" accept=".u9">
+      </label>
+      <p id="soundStatus" class="note"></p>
+      <p class="note" data-i18n="extractNote"></p>
+      <p class="note" data-i18n="storageNote"></p>
+      <p class="note" data-i18n="legalNote"></p>
+    </section>
+    <section>
+      <h2 data-i18n="additionalSettings"></h2>
+      <label class="field"><span data-i18n="aspectRatio"></span>
+        <select id="aspect"><option value="0" data-i18n="aspectOriginal"></option><option value="1" data-i18n="aspectWide"></option></select>
+      </label>
+      <label class="field"><span data-i18n="menuLanguage"></span>
+        <select id="language"><option value="en" data-i18n="languageEnglish"></option><option value="es" data-i18n="languageSpanish"></option></select>
+      </label>
+      <label class="field"><span data-i18n="displayMode"></span>
+        <select id="display"><option value="windowed" data-i18n="displayWindowed"></option><option value="fullscreen" data-i18n="displayFullscreen"></option></select>
+      </label>
+      <button id="mapKeys" type="button" data-i18n="mapControls"></button>
+    </section>
+    <section>
+      <button id="run" type="button" disabled data-i18n="launch"></button>
+    </section>
+  </div>
+</div>
+<audio id="audio" preload="auto"></audio>
+<script>
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const canvas = $("canvas"), menu = $("menu"), audio = $("audio");
+
+  const SONG_TRACKS = { ignition: 1, hypnosis: 2, eternal: 3, passion: 4, cat: 5, formlife: 6, rapkyo: 7, dol: 8,
+    funky: 9, youwanna: 10, badblood: 11, nova2: 12, iwantyou: 13, dontknow: 14, cause: 15,
+    mix1: 16, mix2: 17, mix3: 18, mix4: 19 };
+  const TRACK_OFFSET = 5;
+  const KEY_COIN_1 = 10, KEY_COIN_2 = 11, KEY_TEST = 12, KEY_SERVICE = 13, KEY_CLEAR = 14;
+  let keysText = "", keyActions = new Map(), inKeyMap = false;
+
+  const files = new Map();
+  const charts = new Map();
+  const encoder = new TextEncoder();
+  const held = new Set();
+  let gl = null, playing = false, hasAudio = false, extracting = false, libraryMarker = null;
+  let audioContext = null, soundsReady = false;
+  const sfxBuffers = [], sfxVoices = [];
+
+  const LIBRARY = "piu-library";
+  const LIBRARY_VERSION = 2;
+  const SOUNDS = "piu-sfx";
+  const SOUND_STOP = 0xFF;
+  const LIBRARY_BYTES = 800e6;  // The audio and textures, uncompressed, with room to spare.
+  const FOLDER_KEYS = { png: "png:", spr: "spr:", wav: "wav:", bga: "bga:", model: "scene:" };
+  const ASPECT_KEY = "open-it-up-aspect";
+  const DISPLAY_KEY = "open-it-up-display";
+  const KEYS_KEY = "open-it-up-keys";
+
+  const baseName = name => name.trim().replace(/^.*[\\/]/, "").replace(/\.[^.]+$/, "").toLowerCase();
+
+  const LANGUAGE_KEY = "open-it-up-language";
+  const TEXTS = {
+    en: {
+      instructions: "Instructions",
+      loadOriginals: "Load the original files from your own copy of the game:",
+      chdUse: "BGAs, Steps and Sprites.",
+      romUse: "Additional sound effects (Grades, Coins, Menus, etc.).",
+      fileSelection: "File selection",
+      addSounds: "Add sound effects (piu10.u9)",
+      changeSounds: "Change piu10.u9 file",
+      extractNote: "Files are extracted only once and stored in this browser.",
+      storageNote: "Notice: the files are stored in your browsing data. If you clear this site's data, you will need to extract them again.",
+      legalNote: "The files used by this engine must be obtained through a legal backup of your own copy of the game.",
+      additionalSettings: "Additional settings",
+      aspectRatio: "Aspect ratio",
+      aspectOriginal: "Original (4:3)",
+      aspectWide: "Widescreen (16:9)",
+      menuLanguage: "Menu language",
+      languageEnglish: "English",
+      languageSpanish: "Spanish",
+      displayMode: "Display mode",
+      displayWindowed: "Windowed",
+      displayFullscreen: "Fullscreen",
+      mapControls: "Map controls",
+      launch: "Launch game",
+      chooseChd: "Choose CHD file",
+      changeChd: "Change CHD file",
+      noGame: "No game loaded yet.",
+      ready: name => "Ready: " + name,
+      soundsReady: "Sound effects ready.",
+      noSounds: "No sound effects (optional).",
+      opening: "Opening the CHD…",
+      extracting: percent => `Extracting… ${percent}%`,
+      readingSounds: "Reading the sound effects…",
+      "no-space": "There is not enough space in this browser.",
+      incomplete: "The extraction is incomplete. Choose the CHD again.",
+      "no-webgl": "WebGL 2 could not be started in this browser.",
+      "no-storage": "This browser cannot save the game. Use a recent version of Chrome, Edge, Firefox or Safari.",
+      "not-chd": "That file could not be opened as a CHD.",
+      "not-cd": "That CHD is not a CD image.",
+      "wrong-disc": "That CHD is not this game's disc.",
+      damaged: "The game's files are damaged on that CHD.",
+      "read-failed": "Part of that CHD could not be read.",
+      "wrong-sound-rom": "That file is not the game's sound ROM (piu10.u9).",
+    },
+    es: {
+      instructions: "Instrucciones",
+      loadOriginals: "Carga los archivos originales de tu propia copia del juego:",
+      chdUse: "BGAs, Steps y Sprites.",
+      romUse: "Efectos de sonido adicionales (Grades, Monedas, Menús, etc.).",
+      fileSelection: "Selección de archivos",
+      addSounds: "Agregar efectos de sonido (piu10.u9)",
+      changeSounds: "Cambiar archivo piu10.u9",
+      extractNote: "Los archivos se extraen una sola vez y se guardan en este navegador.",
+      storageNote: "Aviso: los archivos se almacenan en tus datos de navegación. Si borras los datos de este sitio, tendrás que extraerlos otra vez.",
+      legalNote: "Los archivos utilizados para este motor, deben ser obtenidos a través de un backup legal de tu propia copia del juego.",
+      additionalSettings: "Configuraciones adicionales",
+      aspectRatio: "Relación de aspecto",
+      aspectOriginal: "Original (4:3)",
+      aspectWide: "Panorámica (16:9)",
+      menuLanguage: "Idioma del menú",
+      languageEnglish: "Inglés",
+      languageSpanish: "Español",
+      displayMode: "Modo de pantalla",
+      displayWindowed: "Ventana",
+      displayFullscreen: "Pantalla completa",
+      mapControls: "Mapear controles",
+      launch: "Lanzar juego",
+      chooseChd: "Elegir archivo CHD",
+      changeChd: "Cambiar archivo CHD",
+      noGame: "Todavía no hay juego cargado.",
+      ready: name => "Listo: " + name,
+      soundsReady: "Efectos de sonido listos.",
+      noSounds: "Sin efectos de sonido (opcional).",
+      opening: "Abriendo el CHD…",
+      extracting: percent => `Extrayendo… ${percent}%`,
+      readingSounds: "Leyendo los efectos de sonido…",
+      "no-space": "No hay espacio suficiente en este navegador.",
+      incomplete: "La extracción quedó incompleta. Vuelve a elegir el CHD.",
+      "no-webgl": "No se pudo iniciar WebGL 2 en este navegador.",
+      "no-storage": "Este navegador no puede guardar el juego. Usa una versión reciente de Chrome, Edge, Firefox o Safari.",
+      "not-chd": "No pude abrir ese archivo como CHD.",
+      "not-cd": "Ese CHD no es de un CD.",
+      "wrong-disc": "Ese CHD no es el disco de este juego.",
+      damaged: "Los archivos del juego vienen dañados en ese CHD.",
+      "read-failed": "No pude leer una parte de ese CHD.",
+      "wrong-sound-rom": "Ese archivo no es la ROM de sonidos del juego (piu10.u9).",
+    },
+  };
+  let language = "en";
+  let currentStatus = { key: "", argument: undefined, warn: false };
+
+  // Text of a message; anything not in the table, like a browser error, passes through.
+  function translate(key, argument) {
+    const text = TEXTS[language][key];
+    if (text === undefined) return key;
+    return typeof text === "function" ? text(argument) : text;
+  }
+
+  function renderStatus() {
+    $("status").textContent = currentStatus.key ? translate(currentStatus.key, currentStatus.argument) : "";
+    $("status").className = currentStatus.warn ? "warn" : "";
+  }
+
+  function setStatus(key, warn = false, argument) {
+    currentStatus = { key, argument, warn };
+    renderStatus();
+  }
+
+  function renderTexts() {
+    document.documentElement.lang = language;
+    for (const element of document.querySelectorAll("[data-i18n]")) element.textContent = translate(element.dataset.i18n);
+  }
+
+  function restoreLanguage() {
+    try { if (localStorage.getItem(LANGUAGE_KEY) === "es") language = "es"; } catch { /* English it is. */ }
+    $("language").value = language;
+    renderTexts();
+  }
+
+  // Copies bytes into engine memory, NUL-terminated, for the length of the callback.
+  function withBytes(bytes, use) {
+    const pointer = Module._piu_alloc(bytes.length + 1);
+    Module.HEAPU8.set(bytes, pointer);
+    Module.HEAPU8[pointer + bytes.length] = 0;
+    try { return use(pointer, bytes.length); } finally { Module._piu_free(pointer); }
+  }
+  const withString = (text, use) => withBytes(encoder.encode(text), use);
+
+  async function readBytes(file) { return new Uint8Array(await file.arrayBuffer()); }
+
+  async function provideTexture(key) {
+    const file = files.get("png:" + key);
+    if (!file) { withString(key, p => Module._piu_missing_texture(p)); return; }
+    const bitmap = await createImageBitmap(file, { premultiplyAlpha: "none", colorSpaceConversion: "none" });
+    withString(key, p => Module._piu_begin_texture(p, bitmap.width, bitmap.height));
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bitmap);
+    bitmap.close();
+  }
+
+  async function provideSprite(key) {
+    const file = files.get("spr:" + key);
+    if (!file) { withString(key, p => Module._piu_missing_sprite(p)); return; }
+    const bytes = await readBytes(file);
+    withString(key, k => withBytes(bytes, (p, n) => Module._piu_provide_sprite(k, p, n)));
+  }
+
+  async function provideAssets() {
+    for (;;) {
+      const pointer = Module._piu_next_asset();
+      if (!pointer) return;
+      const request = Module.UTF8ToString(pointer);
+      if (request.startsWith("spr:")) await provideSprite(request.slice(4));
+      else await provideTexture(request.slice(4));
+    }
+  }
+
+  async function indexLibrary(library) {
+    for await (const [name, handle] of library.entries()) {
+      if (handle.kind === "file") {
+        if (name === "stage.cfg") files.set("cfg:stage", await handle.getFile());
+        continue;
+      }
+      for await (const [, entry] of handle.entries()) {
+        const file = await entry.getFile();
+        const stem = baseName(file.name);
+        if (name === "charts") charts.set(stem, { source: stem + ".stf", file });
+        else if (FOLDER_KEYS[name]) files.set(FOLDER_KEYS[name] + stem, file);
+      }
+    }
+  }
+
+  function renderFileLabels() {
+    $("soundStatus").textContent = translate(soundsReady ? "soundsReady" : "noSounds");
+    $("pickText").textContent = translate(libraryMarker ? "changeChd" : "chooseChd");
+    $("pickSoundsText").textContent = translate(soundsReady ? "changeSounds" : "addSounds");
+  }
+
+  function showLibrary() {
+    const ready = !!libraryMarker;
+    if (ready) setStatus("ready", false, libraryMarker.source);
+    else setStatus("noGame");
+    $("run").disabled = !ready || extracting;
+    $("sounds").disabled = !ready || extracting;
+    $("pickSounds").classList.toggle("busy", !ready || extracting);
+    renderFileLabels();
+    $("pick").classList.toggle("quiet", ready);
+  }
+
+  async function openLibrary() {
+    files.clear();
+    charts.clear();
+    libraryMarker = null;
+    try {
+      const root = await navigator.storage.getDirectory();
+      const library = await root.getDirectoryHandle(LIBRARY);
+      const marker = JSON.parse(await (await (await library.getFileHandle("library.json")).getFile()).text());
+      if (marker.version === LIBRARY_VERSION) {
+        await indexLibrary(library);
+        libraryMarker = marker;
+      }
+    } catch { /* No finished library yet. */ }
+    await loadSounds();
+    showLibrary();
+  }
+
+  async function loadSounds() {
+    sfxBuffers.length = 0;
+    soundsReady = false;
+    try {
+      const root = await navigator.storage.getDirectory();
+      const sounds = await root.getDirectoryHandle(SOUNDS);
+      await sounds.getFileHandle("sounds.json");
+      for await (const [name, handle] of sounds.entries()) {
+        if (!/^\d+\.wav$/.test(name)) continue;
+        const bytes = await (await handle.getFile()).arrayBuffer();
+        sfxBuffers[parseInt(name, 10)] = await audioContext.decodeAudioData(bytes);
+      }
+      soundsReady = sfxBuffers.length > 0;
+    } catch { /* The game runs without sound effects. */ }
+  }
+
+  // A new sound replaces the one on its channel.
+  function playSound(code) {
+    const channel = code >> 8 & 0xFF;
+    if ((code & 0xFF) === SOUND_STOP) { stopVoice(channel); return; }
+    const buffer = sfxBuffers[code & 0xFF];
+    if (!buffer) return;
+    stopVoice(channel);
+    const source = audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.loop = (code >> 16 & 1) === 1;
+    source.connect(audioContext.destination);
+    source.start();
+    sfxVoices[channel] = source;
+  }
+
+  function stopVoice(channel) {
+    try { sfxVoices[channel]?.stop(); } catch { /* It had already ended. */ }
+    sfxVoices[channel] = null;
+  }
+
+  function stopSounds() {
+    for (let channel = 0; channel < sfxVoices.length; channel++) stopVoice(channel);
+  }
+
+  function setExtracting(active) {
+    extracting = active;
+    $("chd").disabled = active;
+    $("pick").classList.toggle("busy", active);
+    if (active) $("sounds").disabled = true;
+    $("progress").hidden = !active;
+    $("progress").value = 0;
+    if (active) $("run").disabled = true;
+  }
+
+  function runExtraction(job, file) {
+    return new Promise((resolve, reject) => {
+      const worker = new Worker("extract_worker.js");
+      const finish = settle => { worker.terminate(); settle(); };
+      worker.onmessage = ({ data }) => {
+        if (data.type === "progress") {
+          $("progress").value = data.percent;
+          setStatus("extracting", false, data.percent);
+        } else if (data.type === "done") {
+          finish(resolve);
+        } else {
+          finish(() => reject(new Error(data.message)));
+        }
+      };
+      worker.onerror = event => finish(() => reject(new Error(event.message)));
+      worker.postMessage({ job, file });
+    });
+  }
+
+  async function extractChd(file) {
+    if (extracting) return;
+    setExtracting(true);
+    setStatus("opening");
+    let failure = null;
+    try {
+      navigator.storage.persist?.().catch(() => {});
+      const { quota = Infinity, usage = 0 } = await navigator.storage.estimate();
+      if (!libraryMarker && quota - usage < LIBRARY_BYTES) throw new Error("no-space");
+      await runExtraction("game", file);
+    } catch (error) {
+      failure = error.message || String(error);
+    }
+    setExtracting(false);
+    await openLibrary();
+    if (failure) setStatus(failure, true);
+  }
+
+  async function extractSounds(file) {
+    if (extracting || !libraryMarker) return;
+    setExtracting(true);
+    setStatus("readingSounds");
+    let failure = null;
+    try {
+      await runExtraction("sounds", file);
+    } catch (error) {
+      failure = error.message || String(error);
+    }
+    setExtracting(false);
+    await openLibrary();
+    if (failure) setStatus(failure, true);
+  }
+
+  function stopMusic() { audio.pause(); audio.removeAttribute("src"); audio.load(); }
+
+  async function playTrack(track, loop = false) {
+    const wav = files.get(TRACK_NAME(track));
+    if (!wav) return false;
+    if (audio.src) URL.revokeObjectURL(audio.src);
+    audio.src = URL.createObjectURL(wav);
+    audio.loop = loop;
+    audio.currentTime = 0;
+    try { await audio.play(); return true; } catch { return false; }
+  }
+
+  const chartByName = stem => charts.get(stem) || null;
+
+  async function startAttract() {
+    if (inAttract || !libraryMarker) return;
+    const a = files.get("bga:andamiro"), s = files.get("bga:start");
+    const ok = a && s && await Promise.all([a, s].map(readBytes)).then(([andamiro, start]) =>
+      withBytes(andamiro, (p, n) => withBytes(start, (q, m) => Module._piu_attract_prepare(p, n, q, m))));
+    if (!ok || !await prepareFlow()) {
+      showMenu();
+      setStatus("incomplete", true);
+      return;
+    }
+    await provideAssets();
+    Module._piu_attract_begin(performance.now());
+    inAttract = true;
+    menu.hidden = true;
+    document.activeElement?.blur?.();
+  }
+
+  async function prepareFlow() {
+    const cfg = files.get("cfg:stage"), names = ["mode", "music", "cdsel", "help"].map(n => files.get("bga:" + n));
+    if (!cfg || names.some(f => !f)) return false;
+    const [c, m, u, d, h] = await Promise.all([cfg, ...names].map(readBytes));
+    return !!withBytes(c, (a, an) => withBytes(m, (b, bn) => withBytes(u, (e, en) => withBytes(d, (g, gn) =>
+      withBytes(h, (i, ineed) => Module._piu_flow_prepare(a, an, b, bn, e, en, g, gn, i, ineed))))));
+  }
+
+  function backToAttract() {
+    flow = null;
+    playing = false;
+    inResults = false;
+    stopMusic();
+    Module._piu_flow_to_attract(performance.now());
+  }
+
+  function startCredit(players) {
+    Module._piu_flow_new_credit(players);
+    // SHOW HELP is compared with the machine difficulty.
+    const help = Module._piu_settings_get(3), difficulty = Module._piu_settings_get(1);
+    if (help === 0 || (help === 1 && difficulty === 0) || (help === 2 && difficulty <= 1)) {
+      flow = "help";
+      Module._piu_help_begin(performance.now());
+      playTrack(HELP_TRACK);
+    } else {
+      beginSelect();
+    }
+  }
+
+  function beginSelect() {
+    flow = "select";
+    stopMusic();
+    Module._piu_select_begin(performance.now());
+  }
+
+  async function handleSelectEvents() {
+    for (;;) {
+      const event = Module._piu_select_event();
+      if (event === 0) return;
+      if (event >= 1 && event <= 3) playTrack(Module._piu_select_track());
+      else if (event === 4) stopMusic();
+      else if (event === 5) {
+        Module._piu_select_request_title();
+        await provideAssets();
+        if (flow === "select") Module._piu_select_title_ready();
+      } else if (event === 6) playSelected();
+    }
+  }
+
+  async function playSelected() {
+    flow = "game";
+    const chartName = baseName(Module.UTF8ToString(Module._piu_select_text(0)));
+    const bgaName = baseName(Module.UTF8ToString(Module._piu_select_text(1)));
+    const chart = chartByName(chartName);
+    const cd = Module._piu_select_cd(), offset = Module._piu_select_cd_offset(), mode = Module._piu_select_mode();
+    const players = Module._piu_select_players(), level = Module._piu_select_level(), stage = Module._piu_flow_stage();
+    const flag = mode === 2 ? 4 : mode === 3 ? 0x800 : mode === 4 ? 0x400 : 0;
+    const p1 = Module._piu_select_word(0), p2 = Module._piu_select_word(1) | flag | players;
+    Module._piu_select_end();
+    const isRemix = /^remix/.test(bgaName), isBattle = /^bat/.test(bgaName);
+    const bgaFile = isRemix || isBattle ? null : files.get("bga:" + bgaName);
+    if (!chart || (!bgaFile && !isRemix && !isBattle)) { backToAttract(); return; }
+    const chartBytes = await readBytes(chart.file);
+    const bgaBytes = bgaFile ? await readBytes(bgaFile) : encoder.encode('{"layers":[]}');
+    const gameview = files.get("bga:gameview");
+    const gameviewBytes = gameview ? await readBytes(gameview) : encoder.encode("{}");
+    const ok = withBytes(chartBytes, (c, cn) => withBytes(bgaBytes, (b, bn) =>
+      withBytes(gameviewBytes, (g, gn) => Module._piu_prepare(c, cn, b, bn, g, gn))));
+    if (!ok) { backToAttract(); return; }
+    let useFlight = 0;
+    if (isRemix && files.has("scene:scene")) {
+      const scene = await readBytes(files.get("scene:scene"));
+      useFlight = withBytes(scene, (p, n) => Module._piu_load_flight(p, n)) ? 1 : 0;
+    }
+    await provideAssets();
+    if (flow !== "game") return;
+    const hasSound = await playTrack(cd + offset);
+    hasAudio = hasSound;
+    const machine = Module._piu_settings_get(1);
+    const chartMargin = withString(chart.source, p => Module._piu_chart_margin(p));
+    const margin = machine === 0 ? 0 : Math.min(5, chartMargin + (machine === 2 ? 1 : 0));
+    lastStage = stage;
+    const doublePlay = mode === 2 ? 1 : 0, rightOnly = players === 2 && !doublePlay ? 1 : 0;
+    if (Module._piu_begin(p1, p2, margin, doublePlay, stage, level, useFlight, Date.now() >>> 0, 0, rightOnly, performance.now(), hasSound ? audio.currentTime * 1000 : 0)) {
+      playing = true;
+    } else {
+      backToAttract();
+    }
+  }
+
+  function leaveAttract() {
+    flow = null;
+    inAttract = false;
+    inDemo = false;
+    playing = false;
+    stopMusic();
+    showMenu();
+  }
+
+  async function startDemo(index) {
+    const [stem, cdId] = DEMO_SONGS[index];
+    const chart = chartByName(stem);
+    const name = Object.keys(SONG_TRACKS).find(key => SONG_TRACKS[key] === cdId);
+    const bga = name && files.get("bga:" + name);
+    if (!chart || !bga) { Module._piu_attract_demo_done(performance.now()); return; }
+    const chartBytes = await readBytes(chart.file), bgaBytes = await readBytes(bga);
+    const gameview = files.get("bga:gameview");
+    const gameviewBytes = gameview ? await readBytes(gameview) : encoder.encode("{}");
+    const ok = withBytes(chartBytes, (c, cn) => withBytes(bgaBytes, (b, bn) =>
+      withBytes(gameviewBytes, (g, gn) => Module._piu_prepare(c, cn, b, bn, g, gn))));
+    if (!ok) { Module._piu_attract_demo_done(performance.now()); return; }
+    await provideAssets();
+    if (!inAttract) return;
+    const hasSound = Module._piu_settings_get(4) === 1 && await playTrack(cdId + TRACK_OFFSET);
+    hasAudio = hasSound;
+    const machine = Module._piu_settings_get(1);
+    const margin = machine === 2 ? 1 : 0;
+    if (Module._piu_begin(0, 0, margin, 0, 1, 0, 0, Date.now() >>> 0, 1, 0, performance.now(), hasSound ? audio.currentTime * 1000 : 0)) {
+      playing = true;
+      inDemo = true;
+    } else {
+      Module._piu_attract_demo_done(performance.now());
+    }
+  }
+
+  function endDemo() {
+    inDemo = false;
+    playing = false;
+    stopMusic();
+    Module._piu_attract_demo_done(performance.now());
+  }
+
+  function handleAttractEvents() {
+    for (;;) {
+      const event = Module._piu_attract_event();
+      if (event === 0) return;
+      if (event === 1) playTrack(INTRO_TRACK);
+      else if (event === 2) stopMusic();
+      else if (event === 3) startDemo(Module._piu_attract_demo_index());
+      else if (event === 4) {
+        startCredit(Module._piu_attract_players());
+        return;
+      }
+    }
+  }
+
+  function showMenu() {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    playing = false;
+    held.clear();
+    Module._piu_stop();
+    // The launcher is the machine turned off, and its credits are only in RAM.
+    Module._piu_coin_reset();
+    audio.pause();
+    stopSounds();
+    menu.hidden = false;
+    showLibrary();
+  }
+
+  let inResults = false, inService = false, lastStage = 1, inAttract = false, inDemo = false;
+  // The credit being played: null, "help", "select" or "game".
+  let flow = null;
+  const HELP_TRACK = 3;
+  // The first ten songs of the EASY table in stage.cfg, in order.
+  const DEMO_SONGS = [["finkl_2", 3], ["ff_ez_2", 6], ["rap_2", 7], ["tiger_2", 13], ["tiger_2", 13],
+    ["yj_ez_2", 4], ["dol_ez_2", 8], ["no_ez_2", 12], ["molla_2", 14], ["eu_2", 15]];
+  const INTRO_TRACK = 2;
+  const STORAGE_KEY = "open-it-up-settings";
+  const TRACK_NAME = n => "wav:track" + String(n).padStart(2, "0");
+
+  // Per-browser stand-in for the machine's EEPROM.
+  function restoreSettings() {
+    try {
+      const v = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+      if (Array.isArray(v) && v.length === 6) Module._piu_settings_load(...v.map(Number));
+    } catch { /* Defaults apply. */ }
+  }
+  function saveSettings() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify([0, 1, 2, 3, 4, 5].map(i => Module._piu_settings_get(i)))); }
+    catch { /* Settings still work until the page closes. */ }
+  }
+  function applySettings() {
+    Module._piu_coin_configure(Module._piu_settings_get(5), Module._piu_settings_get(0) === 1 ? 1 : 0);
+  }
+
+  async function openService() {
+    flow = null;
+    if (inService || extracting || !libraryMarker) return;
+    if (playing || inResults) { playing = inResults = false; audio.pause(); Module._piu_stop(); held.clear(); }
+    Module._piu_service_request();
+    await provideAssets();
+    Module._piu_service_open();
+    inService = true;
+    menu.hidden = true;
+  }
+
+  function closeService() {
+    inService = false;
+    held.clear();
+    audio.pause();
+    stopSounds();
+    saveSettings();
+    applySettings();
+    // Leaving the menu in EVENT mode pays two credits.
+    if (Module._piu_settings_get(0) === 1) Module._piu_coin_add(2);
+    // Leaving the menu restarts the machine at the Andamiro screen.
+    startAttract();
+  }
+
+  function endSong() {
+    if (!playing) return;
+    audio.pause();
+    playing = false;
+    held.clear();
+    if (Module._piu_show_results(lastStage, performance.now())) {
+      inResults = true;
+    } else {
+      backToAttract();
+    }
+  }
+
+  function finishResults() {
+    inResults = false;
+    if (Module._piu_flow_game_over()) backToAttract();
+    else beginSelect();
+  }
+
+  function restoreAspect() {
+    let wide = "0";
+    try { if (localStorage.getItem(ASPECT_KEY) === "1") wide = "1"; } catch { /* Original it is. */ }
+    $("aspect").value = wide;
+    Module._piu_set_wide(Number(wide));
+  }
+
+  function applyKeys(text) {
+    keysText = text;
+    keyActions = new Map(text.split(",").map((code, action) => [code, action]));
+  }
+
+  function restoreKeys() {
+    let saved = "";
+    try { saved = localStorage.getItem(KEYS_KEY) || ""; } catch { /* The default layout it is. */ }
+    applyKeys(withString(saved, p => Module.UTF8ToString(Module._piu_keymap_normalize(p))));
+  }
+
+  function openKeyMap() {
+    withString(keysText, p => Module._piu_keymap_open(p, language === "es" ? 1 : 0));
+    inKeyMap = true;
+    Module._piu_set_wide(0);
+    canvas.classList.add("keymap");
+    menu.hidden = true;
+  }
+
+  function closeKeyMap(result) {
+    if (result === 1) {
+      applyKeys(Module.UTF8ToString(Module._piu_keymap_result()));
+      try { localStorage.setItem(KEYS_KEY, keysText); } catch { /* Lasts until the page closes. */ }
+    }
+    Module._piu_keymap_close();
+    inKeyMap = false;
+    Module._piu_set_wide(Number($("aspect").value));
+    canvas.classList.remove("keymap");
+    menu.hidden = false;
+  }
+
+  function restoreDisplay() {
+    let display = "windowed";
+    try { if (localStorage.getItem(DISPLAY_KEY) === "fullscreen") display = "fullscreen"; } catch { /* Windowed it is. */ }
+    $("display").value = display;
+  }
+
+  // Browsers only allow this from the click on the launch button.
+  function enterChosenDisplay() {
+    if ($("display").value !== "fullscreen") return;
+    const root = document.documentElement;
+    const request = root.requestFullscreen || root.webkitRequestFullscreen;
+    Promise.resolve(request?.call(root)).catch(() => {});
+  }
+
+  function start() {
+    if (!Module._piu_start()) {
+      setStatus("no-webgl", true);
+      $("chd").disabled = true;
+      return;
+    }
+    gl = canvas.getContext("webgl2");
+    gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
+
+    restoreSettings();
+    applySettings();
+    restoreAspect();
+    restoreDisplay();
+    restoreKeys();
+    $("mapKeys").addEventListener("click", openKeyMap);
+    canvas.addEventListener("mousedown", event => {
+      if (!inKeyMap) return;
+      const ratio = devicePixelRatio || 1;
+      Module._piu_keymap_click(event.offsetX * ratio, event.offsetY * ratio, canvas.width, canvas.height);
+    });
+    $("language").addEventListener("change", event => {
+      language = event.target.value;
+      try { localStorage.setItem(LANGUAGE_KEY, language); } catch { /* Lasts until the page closes. */ }
+      renderTexts();
+      renderFileLabels();
+      renderStatus();
+    });
+    audioContext = new AudioContext();
+    $("run").addEventListener("click", () => { enterChosenDisplay(); audioContext.resume(); startAttract(); });
+    $("display").addEventListener("change", event => {
+      try { localStorage.setItem(DISPLAY_KEY, event.target.value); } catch { /* Lasts until the page closes. */ }
+    });
+    $("aspect").addEventListener("change", event => {
+      Module._piu_set_wide(Number(event.target.value));
+      try { localStorage.setItem(ASPECT_KEY, event.target.value); } catch { /* Lasts until the page closes. */ }
+    });
+    $("chd").addEventListener("change", event => {
+      const [file] = event.target.files;
+      event.target.value = "";
+      if (file) extractChd(file);
+    });
+    $("sounds").addEventListener("change", event => {
+      const [file] = event.target.files;
+      event.target.value = "";
+      if (file) extractSounds(file);
+    });
+    if (navigator.storage?.getDirectory) {
+      openLibrary();
+    } else {
+      setStatus("no-storage", true);
+      $("chd").disabled = true;
+    }
+
+    function onKey(event, down) {
+      if (down && audioContext.state === "suspended") audioContext.resume();
+      if (inKeyMap) {
+        event.preventDefault();
+        if (down && !event.repeat) withString(event.code, p => Module._piu_keymap_key(p));
+        return;
+      }
+      // The launcher comes before the machine: no key does anything to the game here.
+      if (!menu.hidden) return;
+      const action = keyActions.get(event.code);
+      if (action === KEY_TEST && down && !event.repeat && !inService) {
+        event.preventDefault();
+        if (inAttract) { inAttract = false; inDemo = false; stopMusic(); }
+        openService();
+        return;
+      }
+      if (inService && (action === KEY_TEST || action === KEY_SERVICE || action === KEY_CLEAR)) {
+        event.preventDefault();
+        if (!event.repeat) Module._piu_service_button(action === KEY_TEST ? 0 : action === KEY_SERVICE ? 1 : 2, down ? 1 : 0);
+        return;
+      }
+      if (action === KEY_COIN_1 || action === KEY_COIN_2) {
+        event.preventDefault();
+        if (down && !event.repeat) Module._piu_coin_insert();
+        return;
+      }
+      if (event.code === "Escape" && down && inAttract) { inResults = false; leaveAttract(); return; }
+      const panel = action < 10 ? action : undefined;
+      if (panel === undefined || (!playing && !inResults && !inService && !inAttract)) return;
+      event.preventDefault();
+      if (event.repeat) return;
+      if (down) held.add(panel); else held.delete(panel);
+      Module._piu_input(panel, down ? 1 : 0, event.timeStamp);
+    }
+    addEventListener("keydown", event => onKey(event, true));
+    addEventListener("keyup", event => onKey(event, false));
+    addEventListener("blur", () => {
+      for (const panel of held) Module._piu_input(panel, 0, performance.now());
+      held.clear();
+    });
+
+    function frame(now) {
+      if (!Module._piu_frame_due(now)) { requestAnimationFrame(frame); return; }
+      const ratio = devicePixelRatio || 1;
+      const width = Math.max(1, Math.round(canvas.clientWidth * ratio));
+      const height = Math.max(1, Math.round(canvas.clientHeight * ratio));
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+      if (inKeyMap) {
+        const result = Module._piu_keymap_finished();
+        if (result) closeKeyMap(result);
+      }
+      Module._piu_frame(now, playing && hasAudio && !audio.paused ? audio.currentTime * 1000 : -1, width, height);
+      for (let code; (code = Module._piu_next_sound()) >= 0;) playSound(code);
+      if (playing && Module._piu_take_audio_stop()) audio.pause();
+      if (inDemo) { if (Module._piu_finished()) endDemo(); }
+      else if (playing && Module._piu_finished()) endSong();
+      if (inAttract && !flow) handleAttractEvents();
+      if (flow === "help" && Module._piu_help_finished()) beginSelect();
+      if (flow === "select") handleSelectEvents();
+      if (inResults && Module._piu_results_finished()) finishResults();
+      if (inService) {
+        const track = Module._piu_service_track();
+        if (track === 0) audio.pause();
+        else if (track > 0) {
+          audio.pause();
+          const wav = files.get(TRACK_NAME(track));
+          if (wav) {
+            if (audio.src) URL.revokeObjectURL(audio.src);
+            audio.src = URL.createObjectURL(wav);
+            audio.currentTime = 0;
+            audio.play().catch(() => {});
+          }
+        }
+        if (Module._piu_service_finished()) closeService();
+      }
+
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  restoreLanguage();
+  renderFileLabels();
+  var Module = { canvas, onRuntimeInitialized: start };
+</script>
+{{{ SCRIPT }}}
+</body>
+</html>

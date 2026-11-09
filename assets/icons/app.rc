@@ -1,0 +1,3 @@
+// The icon and the manifest of the Windows program.
+1 ICON "icon.ico"
+1 24 "app.manifest"
