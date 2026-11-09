@@ -525,6 +525,16 @@ void test_scene_flight() {
   game.draw(list, 0.0);
   check(list.scene() == &*scene, "usa el vuelo como fondo");
 
+  int shared_counter = 3;
+  piu::GameOptions next_song;
+  next_song.flight = &*scene;
+  next_song.flight_counter = &shared_counter;
+  piu::Game carried(chart_with_rows({{1.0, 1}}), piu::Bga{}, piu::Bga{}, arrow_assets(), next_song);
+  check(shared_counter == 3, "el vuelo sigue donde se quedo");
+  std::int64_t carried_tick = 0;
+  run_until(carried, carried_tick, 4);
+  check(shared_counter != 3, "y avanza con la cancion");
+
   piu::GameOptions remix;
   remix.flight = &*scene;
   remix.stage = 2;
@@ -701,7 +711,7 @@ void test_results_screen() {
   for (int i = 0; i < 4; ++i) skipped.step();
   piu::DrawList hold;
   skipped.draw(hold);
-  check(hold.vertices().size() / 6 == 8 + 2 + 1 + 7 + 6 + 1 + 3 * 6, "salta a ver todas las filas");
+  check(hold.vertices().size() == not_skipped.vertices().size(), "al saltar se queda la imagen del conteo");
   for (int i = 0; i < 4 * (60 + 2); ++i) skipped.step();
   piu::DrawList final_screen;
   skipped.draw(final_screen);
@@ -1181,6 +1191,39 @@ void test_io_panels_match_their_boxes() {
   }
 }
 
+void test_service_menu_rows_and_colors() {
+  piu::Assets assets;
+  assets.set_texture("hfont1", {1, 256, 256});
+  assets.set_texture("white", {2, 4, 4});
+
+  piu::ServiceMenu game(piu::MachineSettings{}, assets);
+  for (int i = 0; i < 3; ++i) game.press_test();  // GAME OPTION
+  game.press_service();
+  game.press_service();  // GAME MODE -> EVENT
+  for (int i = 0; i < 6; ++i) game.press_test();  // CLEAR RANKING
+  piu::DrawList before;
+  game.draw(before);
+  game.press_service();
+  piu::DrawList after;
+  game.draw(after);
+  check(after.vertices().size() == before.vertices().size(), "CLEAR RANKING no cambia la pantalla");
+  check(game.settings().game_mode == 0, "CLEAR RANKING no guarda las opciones");
+  game.press_test();  // SAVE AND EXIT
+  game.press_service();
+  check(game.settings().game_mode == 1, "SAVE AND EXIT es la fila siguiente");
+
+  piu::ServiceMenu eeprom(piu::MachineSettings{}, assets);
+  eeprom.press_test();  // EEPROM TEST
+  eeprom.press_service();
+  piu::DrawList list;
+  eeprom.draw(list);
+  std::size_t yellow = 0;
+  for (const piu::Vertex& v : list.vertices()) {
+    if (v.color.r == 1.0f && v.color.g == 1.0f && v.color.b == 0.0f) ++yellow;
+  }
+  check(yellow == (36 + 36 + 7) * 6, "los valores de EEPROM TEST son amarillos");
+}
+
 void test_service_menu() {
   piu::Assets assets;
   assets.set_texture("hfont1", {1, 256, 256});
@@ -1192,14 +1235,14 @@ void test_service_menu() {
   menu.press_service();  // GAME MODE -> EVENT
   menu.press_test();
   menu.press_service();  // DIFFICULTY -> NORMAL
-  for (int i = 0; i < 6; ++i) menu.press_test();  // EXIT
+  for (int i = 0; i < 7; ++i) menu.press_test();  // EXIT
   menu.press_service();
   check(menu.settings().game_mode == 0 && menu.settings().difficulty == 0, "EXIT no guarda");
 
   menu.press_service();  // Back in GAME OPTION with the cursor on EXIT.
   for (int i = 0; i < 2; ++i) menu.press_test();
   menu.press_service();  // Cursor wrapped to row 1: DIFFICULTY.
-  for (int i = 0; i < 5; ++i) menu.press_test();  // SAVE AND EXIT
+  for (int i = 0; i < 6; ++i) menu.press_test();  // SAVE AND EXIT
   menu.press_service();
   check(menu.settings().difficulty == 1, "SAVE AND EXIT guarda");
 
@@ -1365,6 +1408,33 @@ void test_battle_sends_only_the_panels_of_the_first_frame() {
     return game.stats(1).tally[0];
   };
   check(play({5}) == 1, "se envia solo el panel del primer cuadro");
+}
+
+void test_results_hold_keeps_the_last_counted_frame() {
+  piu::Assets assets;
+  assets.set_texture("dec2", {1, 256, 256});
+  assets.set_texture("arrow01", {2, 256, 256});
+  std::string sprites = "TYPE TILE\n";
+  for (int i = 0; i < 0xdd; ++i) sprites += "T arrow01.tga 10 10 20 20 0 0 20 20\n";
+  assets.set_sprite("gamescr", sprites);
+  std::array<piu::ResultPlayer, 2> players{};
+  players[0].active = true;
+  players[0].counts = {50, 5, 1, 0, 0, 40};
+  players[0].points = 1000;
+  players[0].grade = 'A';
+  piu::ResultsScreen screen(players, assets);
+  const auto quads = [&] {
+    piu::DrawList list;
+    screen.draw(list);
+    return list.vertices().size() / 6;
+  };
+  for (int i = 0; i < 4 * 10; ++i) screen.step();
+  const std::size_t counting = quads();
+  screen.press_center(0);
+  for (int i = 0; i < 4 * 2; ++i) screen.step();
+  check(quads() == counting, "al saltar no aparecen filas nuevas en cero");
+  for (int i = 0; i < 4 * 70; ++i) screen.step();
+  check(quads() > counting, "el final muestra todas las filas");
 }
 
 void test_battle_results_show_win_and_lose() {
@@ -1660,6 +1730,7 @@ int main() {
   test_coins();
   test_frame_limiter_holds_60_fps();
   test_display_swap_interval();
+  test_results_hold_keeps_the_last_counted_frame();
   test_calibration();
   test_results_screen();
   test_ending_clip_time();
@@ -1676,6 +1747,7 @@ int main() {
   test_attract_loop();
   test_io_panels_match_their_boxes();
   test_service_menu();
+  test_service_menu_rows_and_colors();
   test_chart_margin_table();
   test_life_bar_alternates_per_drawn_frame();
   test_two_life_bars_take_turns();

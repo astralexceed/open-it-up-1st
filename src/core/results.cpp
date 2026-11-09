@@ -121,6 +121,7 @@ void ResultsScreen::run_frame() {
       all_done = all_done && previous_done;
     }
     if (all_done || skip_) {
+      count_end_frame_ = phase_frames_;
       phase_ = Phase::kHold;
       phase_frames_ = 0;
     }
@@ -217,13 +218,14 @@ void ResultsScreen::draw(DrawList& out) const {
     }
   }
 
-  if (phase_ == Phase::kCounting) {
+  if (phase_ == Phase::kCounting || phase_ == Phase::kHold) {
+    // During the hold the original draws nothing, so the last frame of the count stays on
+    // screen: rows that had not started are still missing.
+    const int frame = phase_ == Phase::kCounting ? phase_frames_ : count_end_frame_;
     for (std::size_t row = 0; row < started_.size() && started_[row]; ++row) {
-      const auto elapsed = static_cast<float>(phase_frames_ - start_time_[row]);
+      const auto elapsed = static_cast<float>(frame - start_time_[row]);
       draw_row(out, static_cast<int>(row), {1.0f, 1.0f, 1.0f, std::min(1.0f, elapsed * kRowFadePerFrame)}, false);
     }
-  } else if (phase_ == Phase::kHold) {
-    for (std::size_t row = 0; row < started_.size(); ++row) draw_row(out, static_cast<int>(row), white, false);
   } else {
     for (std::size_t row = 0; row < started_.size(); ++row) draw_row(out, static_cast<int>(row), white, true);
     if (battle_) {

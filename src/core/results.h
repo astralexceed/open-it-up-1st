@@ -62,6 +62,8 @@ class ResultsScreen {
   Phase phase_ = Phase::kCounting;
   std::int64_t ticks_ = 0;
   int phase_frames_ = 0;
+  // The frame of the count at which it stopped; the hold keeps showing that image.
+  int count_end_frame_ = 0;
   bool skip_ = false;
   bool game_over_ = false;
   float screen_brightness_ = 1.0f;
