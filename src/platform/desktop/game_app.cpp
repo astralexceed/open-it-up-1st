@@ -204,12 +204,12 @@ bool GameApp::create_window(const Settings& settings, int width, int height) {
 
   const Uint32 mode = settings.fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_RESIZABLE;
   const Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI | mode;
-  window_ = SDL_CreateWindow("Open It UP: 1st Preservation", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, flags);
+  window_ = SDL_CreateWindow("Open It UP: 1st Reimplementation", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, flags);
   if (window_ == nullptr) {
     // Some systems have no multisampling; the game looks the same otherwise.
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 0);
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0);
-    window_ = SDL_CreateWindow("Open It UP: 1st Preservation", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, flags);
+    window_ = SDL_CreateWindow("Open It UP: 1st Reimplementation", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, flags);
   }
   if (window_ == nullptr || SDL_GL_CreateContext(window_) == nullptr) return false;
 #if defined(_WIN32)
@@ -728,6 +728,7 @@ GameExit GameApp::run() {
   restore_machine_settings();
   apply_machine_settings();
   piu_set_wide(settings_.wide ? 1 : 0);
+  piu_set_scene_opacity(settings_.scene_opacity);
   piu_set_audio_offset(settings_.audio_offset_ms);
 
   if (!start_attract()) return fail("The extraction is incomplete. Choose the CHD again.");

@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Open It UP: 1st Preservation</title>
+<title>Open It UP: 1st Reimplementation</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1000 1000%22%3E%3Crect width=%221000%22 height=%221000%22 rx=%22140%22 fill=%22%231f8fff%22/%3E%3Crect x=%2285%22 y=%22260%22 width=%2290%22 height=%22100%22 fill=%22%23fff%22/%3E%3Crect x=%22175%22 y=%22260%22 width=%22100%22 height=%22480%22 fill=%22%23fff%22/%3E%3Crect x=%22330%22 y=%22260%22 width=%22270%22 height=%22100%22 fill=%22%23000%22/%3E%3Crect x=%22330%22 y=%22260%22 width=%22100%22 height=%22290%22 fill=%22%23000%22/%3E%3Crect x=%22330%22 y=%22450%22 width=%22270%22 height=%22100%22 fill=%22%23000%22/%3E%3Crect x=%22500%22 y=%22450%22 width=%22100%22 height=%22290%22 fill=%22%23000%22/%3E%3Crect x=%22330%22 y=%22640%22 width=%22270%22 height=%22100%22 fill=%22%23000%22/%3E%3Crect x=%22655%22 y=%22260%22 width=%22260%22 height=%22100%22 fill=%22%23000%22/%3E%3Crect x=%22735%22 y=%22260%22 width=%22100%22 height=%22480%22 fill=%22%23000%22/%3E%3C/svg%3E">
 <style>
   :root { color-scheme: dark; --panel: #171528; --raised: #221f3a; --line: #352f59; --ink: #ece9f7; --soft: #a7a1c4; --yellow: #ffcf33; --sky: #87ceeb; --blue: #49b4ff; --warn: #ff8a5c; }
@@ -40,6 +40,8 @@
   code { color: var(--yellow); font: 12px ui-monospace, Menlo, Consolas, monospace; }
   h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--soft); }
   progress { width: 100%; height: 8px; accent-color: var(--yellow); }
+  input[type=range] { width: 100%; margin: 4px 0; accent-color: var(--yellow); }
+  input[type=range]:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
   progress[hidden] { display: none; }
   .note { margin: 0; color: var(--soft); font-size: 12px; }
 </style>
@@ -48,14 +50,14 @@
 <canvas id="canvas" tabindex="-1"></canvas>
 <div id="menu">
   <div class="card">
-    <h1>Open <span>It UP</span>: 1st Preservation</h1>
+    <h1>Open <span>It UP</span>: 1st Reimplementation</h1>
     <div class="columns">
     <div class="column">
     <section>
       <h2 data-i18n="instructions"></h2>
       <p data-i18n="loadOriginals"></p>
       <ul>
-        <li><code>19990930.chd</code>: <span data-i18n="chdUse"></span></li>
+        <li><span data-i18n="chdUse"></span></li>
         <li><code>piu10.u9</code>: <span data-i18n="romUse"></span></li>
       </ul>
     </section>
@@ -86,6 +88,9 @@
       </label>
       <label class="field"><span data-i18n="displayMode"></span>
         <select id="display"><option value="windowed" data-i18n="displayWindowed"></option><option value="fullscreen" data-i18n="displayFullscreen"></option></select>
+      </label>
+      <label class="field"><span><span data-i18n="sceneOpacity"></span>: <output id="opacityValue">100%</output></span>
+        <input id="opacity" type="range" min="0" max="100" step="5" value="100">
       </label>
       <button id="mapKeys" type="button" data-i18n="mapControls"></button>
       <button id="calibrate" type="button" data-i18n="calibrateAudio"></button>
@@ -127,6 +132,7 @@
   const FOLDER_KEYS = { png: "png:", spr: "spr:", wav: "wav:", bga: "bga:", model: "scene:" };
   const ASPECT_KEY = "open-it-up-aspect";
   const DISPLAY_KEY = "open-it-up-display";
+  const OPACITY_KEY = "open-it-up-scene-opacity";
   const KEYS_KEY = "open-it-up-keys";
   const AUDIO_OFFSET_KEY = "open-it-up-audio-offset";
 
@@ -137,7 +143,7 @@
     en: {
       instructions: "Instructions",
       loadOriginals: "Load the original files from your own copy of the game:",
-      chdUse: "BGAs, Steps and Sprites.",
+      chdUse: "Game CHD (any file name): BGAs, Steps and Sprites.",
       romUse: "Additional sound effects (Grades, Coins, Menus, etc.).",
       fileSelection: "File selection",
       addSounds: "Add sound effects (piu10.u9)",
@@ -155,6 +161,7 @@
       displayMode: "Display mode",
       displayWindowed: "Windowed",
       displayFullscreen: "Fullscreen",
+      sceneOpacity: "3D flight opacity",
       mapControls: "Map controls",
       calibrateAudio: "Calibrate audio",
       launch: "Launch game",
@@ -181,7 +188,7 @@
     es: {
       instructions: "Instrucciones",
       loadOriginals: "Carga los archivos originales de tu propia copia del juego:",
-      chdUse: "BGAs, Steps y Sprites.",
+      chdUse: "CHD del juego (con cualquier nombre): BGAs, Steps y Sprites.",
       romUse: "Efectos de sonido adicionales (Grades, Monedas, Menús, etc.).",
       fileSelection: "Selección de archivos",
       addSounds: "Agregar efectos de sonido (piu10.u9)",
@@ -199,6 +206,7 @@
       displayMode: "Modo de pantalla",
       displayWindowed: "Ventana",
       displayFullscreen: "Pantalla completa",
+      sceneOpacity: "Opacidad del vuelo 3D",
       mapControls: "Mapear controles",
       calibrateAudio: "Calibrar audio",
       launch: "Lanzar juego",
@@ -785,6 +793,22 @@
     menu.hidden = false;
   }
 
+  // How visible the 3D backgrounds are, from 0 to 100%.
+  function applyOpacity(percent) {
+    $("opacity").value = String(percent);
+    $("opacityValue").textContent = `${percent}%`;
+    Module._piu_set_scene_opacity(percent);
+  }
+
+  function restoreOpacity() {
+    let percent = 100;
+    try {
+      const saved = localStorage.getItem(OPACITY_KEY);
+      if (saved !== null && Number.isFinite(Number(saved))) percent = Math.min(100, Math.max(0, Math.round(Number(saved))));
+    } catch { /* As drawn it is. */ }
+    applyOpacity(percent);
+  }
+
   function restoreDisplay() {
     let display = "windowed";
     try { if (localStorage.getItem(DISPLAY_KEY) === "fullscreen") display = "fullscreen"; } catch { /* Windowed it is. */ }
@@ -812,6 +836,7 @@
     applySettings();
     restoreAspect();
     restoreDisplay();
+    restoreOpacity();
     restoreKeys();
     restoreAudioOffset();
     $("mapKeys").addEventListener("click", openKeyMap);
@@ -838,6 +863,11 @@
     $("run").addEventListener("click", () => { enterChosenDisplay(); audioContext.resume(); startAttract(); });
     $("display").addEventListener("change", event => {
       try { localStorage.setItem(DISPLAY_KEY, event.target.value); } catch { /* Lasts until the page closes. */ }
+    });
+    $("opacity").addEventListener("input", event => {
+      const percent = Number(event.target.value);
+      applyOpacity(percent);
+      try { localStorage.setItem(OPACITY_KEY, String(percent)); } catch { /* Lasts until the page closes. */ }
     });
     $("aspect").addEventListener("change", event => {
       Module._piu_set_wide(Number(event.target.value));

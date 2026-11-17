@@ -29,7 +29,7 @@ constexpr COLORREF kSoft = RGB(0xa7, 0xa1, 0xc4);
 constexpr COLORREF kSky = RGB(0x87, 0xce, 0xeb);
 constexpr COLORREF kWarn = RGB(0xff, 0x8a, 0x5c);
 
-enum Control { kChooseChd = 101, kAddSounds, kLaunch, kAspect, kLanguage, kDisplay, kMapKeys, kCalibrate };
+enum Control { kChooseChd = 101, kAddSounds, kLaunch, kAspect, kLanguage, kDisplay, kMapKeys, kCalibrate, kOpacity };
 
 struct Text {
   const char* key;
@@ -40,7 +40,7 @@ struct Text {
 const Text kTexts[] = {
     {"instructions", "Instructions", "Instrucciones"},
     {"loadOriginals", "Load the original files from your own copy of the game:", "Carga los archivos originales de tu propia copia del juego:"},
-    {"chdUse", "19990930.chd: BGAs, Steps and Sprites.", "19990930.chd: BGAs, Steps y Sprites."},
+    {"chdUse", "Game CHD (any file name): BGAs, Steps and Sprites.", "CHD del juego (con cualquier nombre): BGAs, Steps y Sprites."},
     {"romUse", "piu10.u9: Additional sound effects (Grades, Coins, Menus, etc.).", "piu10.u9: Efectos de sonido adicionales (Grades, Monedas, Menús, etc.)."},
     {"fileSelection", "File selection", "Selección de archivos"},
     {"addSounds", "Add sound effects (piu10.u9)", "Agregar efectos de sonido (piu10.u9)"},
@@ -57,6 +57,7 @@ const Text kTexts[] = {
     {"displayMode", "Display mode", "Modo de pantalla"},
     {"displayWindowed", "Windowed", "Ventana"},
     {"displayFullscreen", "Fullscreen", "Pantalla completa"},
+    {"sceneOpacity", "3D flight opacity", "Opacidad del vuelo 3D"},
     {"mapControls", "Map controls", "Mapear controles"},
     {"calibrateAudio", "Calibrate audio", "Calibrar audio"},
     {"launch", "Launch game", "Lanzar juego"},
@@ -88,7 +89,7 @@ std::wstring wide(const std::string& text) {
 }
 
 struct Item {
-  enum class Kind { kTitle, kLabel, kSeparator, kButton, kCombo, kProgress };
+  enum class Kind { kTitle, kLabel, kSeparator, kButton, kCombo, kProgress, kSlider };
   HWND hwnd;
   Kind kind;
   HFONT font;
@@ -135,6 +136,7 @@ class Launcher {
   void set_status(const std::string& key, const std::string& argument, bool warn);
   void show_library();
   void fill_combo(HWND combo, const char* first, const char* second, int selected);
+  void render_opacity();
   void store_choices();
   void start_job(bool sounds, const wchar_t* filter);
   void leave_for(Start start);
@@ -165,6 +167,8 @@ class Launcher {
   HWND aspect_ = nullptr;
   HWND language_ = nullptr;
   HWND display_ = nullptr;
+  HWND opacity_label_ = nullptr;
+  HWND opacity_ = nullptr;
   Settings settings_;
   LibraryState state_;
   bool busy_ = false;
@@ -233,6 +237,12 @@ void Launcher::build() {
   aspect_ = add_combo("aspectRatio", kAspect);
   language_ = add_combo("menuLanguage", kLanguage);
   display_ = add_combo("displayMode", kDisplay);
+  opacity_label_ = add_label(nullptr, small_, true);
+  opacity_ = add(TRACKBAR_CLASSW, TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, Item::Kind::kSlider, body_, kOpacity);
+  SendMessageW(opacity_, TBM_SETRANGE, FALSE, MAKELPARAM(0, 100));
+  SendMessageW(opacity_, TBM_SETTICFREQ, 10, 0);
+  SendMessageW(opacity_, TBM_SETLINESIZE, 0, 5);
+  SendMessageW(opacity_, TBM_SETPAGESIZE, 0, 10);
   map_keys_ = add(L"BUTTON", BS_PUSHBUTTON | WS_TABSTOP, Item::Kind::kButton, body_, kMapKeys);
   calibrate_ = add(L"BUTTON", BS_PUSHBUTTON | WS_TABSTOP, Item::Kind::kButton, body_, kCalibrate);
   add_separator();
@@ -264,6 +274,7 @@ void Launcher::layout() {
         control_height = scaled(160);
         break;
       case Item::Kind::kProgress: height = scaled(12); break;
+      case Item::Kind::kSlider: height = scaled(30); break;
       case Item::Kind::kButton: break;
       case Item::Kind::kLabel: {
         wchar_t buffer[512];
@@ -293,6 +304,12 @@ void Launcher::fill_combo(HWND combo, const char* first, const char* second, int
   SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wide(text(first)).c_str()));
   SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wide(text(second)).c_str()));
   SendMessageW(combo, CB_SETCURSEL, static_cast<WPARAM>(selected), 0);
+}
+
+void Launcher::render_opacity() {
+  const std::string label = text("sceneOpacity") + ": " + std::to_string(settings_.scene_opacity) + "%";
+  SetWindowTextW(opacity_label_, wide(label).c_str());
+  InvalidateRect(opacity_label_, nullptr, TRUE);
 }
 
 void Launcher::render_status() {
@@ -336,6 +353,8 @@ void Launcher::render_texts() {
   fill_combo(aspect_, "aspectOriginal", "aspectWide", settings_.wide ? 1 : 0);
   fill_combo(language_, "languageEnglish", "languageSpanish", settings_.language == "es" ? 1 : 0);
   fill_combo(display_, "displayWindowed", "displayFullscreen", settings_.fullscreen ? 1 : 0);
+  SendMessageW(opacity_, TBM_SETPOS, TRUE, settings_.scene_opacity);
+  render_opacity();
   render_controls();
   render_status();
 }
@@ -351,6 +370,7 @@ void Launcher::show_library() {
 void Launcher::store_choices() {
   settings_.wide = SendMessageW(aspect_, CB_GETCURSEL, 0, 0) == 1;
   settings_.fullscreen = SendMessageW(display_, CB_GETCURSEL, 0, 0) == 1;
+  settings_.scene_opacity = static_cast<int>(SendMessageW(opacity_, TBM_GETPOS, 0, 0));
   save_settings(settings_);
 }
 
@@ -394,7 +414,7 @@ void Launcher::draw_title(const DRAWITEMSTRUCT& item) {
   FillRect(item.hDC, &item.rcItem, panel_);
   const HGDIOBJ previous = SelectObject(item.hDC, title_font_);
   SetBkMode(item.hDC, TRANSPARENT);
-  const std::pair<const wchar_t*, COLORREF> runs[] = {{L"Open ", kInk}, {L"It UP", kSky}, {L": 1st Preservation", kInk}};
+  const std::pair<const wchar_t*, COLORREF> runs[] = {{L"Open ", kInk}, {L"It UP", kSky}, {L": 1st Reimplementation", kInk}};
   int x = item.rcItem.left;
   for (const auto& [run, color] : runs) {
     const int length = static_cast<int>(wcslen(run));
@@ -411,6 +431,13 @@ LRESULT Launcher::handle(HWND window, UINT message, WPARAM wparam, LPARAM lparam
   switch (message) {
     case WM_CTLCOLORSTATIC:
       return color_static(reinterpret_cast<HDC>(wparam), reinterpret_cast<HWND>(lparam));
+    case WM_HSCROLL:
+      if (reinterpret_cast<HWND>(lparam) == opacity_) {
+        settings_.scene_opacity = static_cast<int>(SendMessageW(opacity_, TBM_GETPOS, 0, 0));
+        render_opacity();
+        if (LOWORD(wparam) == TB_ENDTRACK) store_choices();
+      }
+      return 0;
     case WM_DRAWITEM:
       draw_title(*reinterpret_cast<const DRAWITEMSTRUCT*>(lparam));
       return TRUE;
@@ -478,7 +505,7 @@ int Launcher::run() {
   dpi_ = GetDeviceCaps(screen, LOGPIXELSY);
   ReleaseDC(nullptr, screen);
 
-  INITCOMMONCONTROLSEX controls{sizeof(controls), ICC_PROGRESS_CLASS | ICC_STANDARD_CLASSES};
+  INITCOMMONCONTROLSEX controls{sizeof(controls), ICC_PROGRESS_CLASS | ICC_BAR_CLASSES | ICC_STANDARD_CLASSES};
   InitCommonControlsEx(&controls);
 
   panel_ = CreateSolidBrush(kPanel);
@@ -498,7 +525,7 @@ int Launcher::run() {
   type.lpszClassName = L"OpenItUpLauncher";
   RegisterClassExW(&type);
 
-  window_ = CreateWindowExW(0, L"OpenItUpLauncher", L"Open It UP: 1st Preservation", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+  window_ = CreateWindowExW(0, L"OpenItUpLauncher", L"Open It UP: 1st Reimplementation", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
                             CW_USEDEFAULT, CW_USEDEFAULT, 500, 640, nullptr, nullptr, instance_, this);
   if (window_ == nullptr) return 1;
 

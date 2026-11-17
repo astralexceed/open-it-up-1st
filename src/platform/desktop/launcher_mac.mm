@@ -24,7 +24,7 @@ NSDictionary<NSString*, NSDictionary<NSString*, NSString*>*>* Texts() {
     @"en" : @{
       @"instructions" : @"Instructions",
       @"loadOriginals" : @"Load the original files from your own copy of the game:",
-      @"chdUse" : @"19990930.chd: BGAs, Steps and Sprites.",
+      @"chdUse" : @"Game CHD (any file name): BGAs, Steps and Sprites.",
       @"romUse" : @"piu10.u9: Additional sound effects (Grades, Coins, Menus, etc.).",
       @"fileSelection" : @"File selection",
       @"addSounds" : @"Add sound effects (piu10.u9)",
@@ -41,6 +41,7 @@ NSDictionary<NSString*, NSDictionary<NSString*, NSString*>*>* Texts() {
       @"displayMode" : @"Display mode",
       @"displayWindowed" : @"Windowed",
       @"displayFullscreen" : @"Fullscreen",
+      @"sceneOpacity" : @"3D flight opacity",
       @"mapControls" : @"Map controls",
       @"calibrateAudio" : @"Calibrate audio",
       @"launch" : @"Launch game",
@@ -64,7 +65,7 @@ NSDictionary<NSString*, NSDictionary<NSString*, NSString*>*>* Texts() {
     @"es" : @{
       @"instructions" : @"Instrucciones",
       @"loadOriginals" : @"Carga los archivos originales de tu propia copia del juego:",
-      @"chdUse" : @"19990930.chd: BGAs, Steps y Sprites.",
+      @"chdUse" : @"CHD del juego (con cualquier nombre): BGAs, Steps y Sprites.",
       @"romUse" : @"piu10.u9: Efectos de sonido adicionales (Grades, Monedas, Menús, etc.).",
       @"fileSelection" : @"Selección de archivos",
       @"addSounds" : @"Agregar efectos de sonido (piu10.u9)",
@@ -81,6 +82,7 @@ NSDictionary<NSString*, NSDictionary<NSString*, NSString*>*>* Texts() {
       @"displayMode" : @"Modo de pantalla",
       @"displayWindowed" : @"Ventana",
       @"displayFullscreen" : @"Pantalla completa",
+      @"sceneOpacity" : @"Opacidad del vuelo 3D",
       @"mapControls" : @"Mapear controles",
       @"calibrateAudio" : @"Calibrar audio",
       @"launch" : @"Lanzar juego",
@@ -130,6 +132,8 @@ NSColor* Warning() { return [NSColor colorWithSRGBRed:1.0 green:0x8a / 255.0 blu
   NSPopUpButton* _aspect;
   NSPopUpButton* _language;
   NSPopUpButton* _display;
+  NSTextField* _opacityLabel;
+  NSSlider* _opacity;
   piu::desktop::Settings _settings;
   piu::desktop::LibraryState _state;
   BOOL _busy;
@@ -183,6 +187,17 @@ NSColor* Warning() { return [NSColor colorWithSRGBRed:1.0 green:0x8a / 255.0 blu
   return popup;
 }
 
+// 0 to 100%, in steps of 5.
+- (NSSlider*)addSliderWithAction:(SEL)action {
+  NSSlider* slider = [NSSlider sliderWithValue:100 minValue:0 maxValue:100 target:self action:action];
+  slider.numberOfTickMarks = 21;
+  slider.allowsTickMarkValuesOnly = YES;
+  slider.continuous = YES;
+  [_stack addArrangedSubview:slider];
+  [slider.widthAnchor constraintEqualToConstant:_width].active = YES;
+  return slider;
+}
+
 - (void)fillPopup:(NSPopUpButton*)popup keys:(NSArray<NSString*>*)keys selected:(NSInteger)selected {
   [popup removeAllItems];
   for (NSString* key in keys) [popup addItemWithTitle:[self text:key]];
@@ -206,7 +221,7 @@ NSColor* Warning() { return [NSColor colorWithSRGBRed:1.0 green:0x8a / 255.0 blu
   _width = kContentWidth;
 
   NSTextField* title = [self labelForKey:nil size:24 bold:YES];
-  NSMutableAttributedString* name = [[NSMutableAttributedString alloc] initWithString:@"Open It UP: 1st Preservation"];
+  NSMutableAttributedString* name = [[NSMutableAttributedString alloc] initWithString:@"Open It UP: 1st Reimplementation"];
   [name addAttribute:NSFontAttributeName value:[NSFont boldSystemFontOfSize:24] range:NSMakeRange(0, name.length)];
   [name addAttribute:NSForegroundColorAttributeName value:NSColor.labelColor range:NSMakeRange(0, name.length)];
   [name addAttribute:NSForegroundColorAttributeName value:Sky() range:NSMakeRange(5, 5)];
@@ -252,6 +267,9 @@ NSColor* Warning() { return [NSColor colorWithSRGBRed:1.0 green:0x8a / 255.0 blu
   _aspect = [self addPopupForKey:@"aspectRatio" action:@selector(settingChanged:)];
   _language = [self addPopupForKey:@"menuLanguage" action:@selector(languageChanged:)];
   _display = [self addPopupForKey:@"displayMode" action:@selector(settingChanged:)];
+  _opacityLabel = [self labelForKey:nil size:12 bold:NO];
+  _opacityLabel.textColor = NSColor.secondaryLabelColor;
+  _opacity = [self addSliderWithAction:@selector(opacityChanged:)];
   _mapKeys = [self addButtonWithAction:@selector(mapKeys:)];
   _calibrate = [self addButtonWithAction:@selector(calibrate:)];
 
@@ -263,7 +281,7 @@ NSColor* Warning() { return [NSColor colorWithSRGBRed:1.0 green:0x8a / 255.0 blu
                                         styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable
                                           backing:NSBackingStoreBuffered
                                             defer:NO];
-  _window.title = @"Open It UP: 1st Preservation";
+  _window.title = @"Open It UP: 1st Reimplementation";
   _window.appearance = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
   _window.releasedWhenClosed = NO;
   NSView* content = _window.contentView;
@@ -313,6 +331,8 @@ NSColor* Warning() { return [NSColor colorWithSRGBRed:1.0 green:0x8a / 255.0 blu
   [self fillPopup:_aspect keys:@[ @"aspectOriginal", @"aspectWide" ] selected:_settings.wide ? 1 : 0];
   [self fillPopup:_language keys:@[ @"languageEnglish", @"languageSpanish" ] selected:_settings.language == "es" ? 1 : 0];
   [self fillPopup:_display keys:@[ @"displayWindowed", @"displayFullscreen" ] selected:_settings.fullscreen ? 1 : 0];
+  _opacity.integerValue = _settings.scene_opacity;
+  [self renderOpacity];
   [self renderControls];
   [self renderStatus];
 }
@@ -366,6 +386,16 @@ NSColor* Warning() { return [NSColor colorWithSRGBRed:1.0 green:0x8a / 255.0 blu
   _settings.wide = _aspect.indexOfSelectedItem == 1;
   _settings.fullscreen = _display.indexOfSelectedItem == 1;
   piu::desktop::save_settings(_settings);
+}
+
+- (void)renderOpacity {
+  _opacityLabel.stringValue = [NSString stringWithFormat:@"%@: %d%%", [self text:@"sceneOpacity"], _settings.scene_opacity];
+}
+
+- (void)opacityChanged:(id)sender {
+  _settings.scene_opacity = static_cast<int>(_opacity.integerValue);
+  [self renderOpacity];
+  [self storeChoices];
 }
 
 - (void)settingChanged:(id)sender {

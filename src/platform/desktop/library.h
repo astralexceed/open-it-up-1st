@@ -20,6 +20,8 @@ struct Settings {
   std::string keys;
   // How late, in ms, the player hears the music.
   int audio_offset_ms = 0;
+  // How visible the 3D backgrounds (the flight) are, in percent. 100 draws them as usual.
+  int scene_opacity = 100;
   // The machine's EEPROM: mode, difficulty, stage break, help, demo sound, coins.
   std::optional<std::array<int, 6>> machine;
 };

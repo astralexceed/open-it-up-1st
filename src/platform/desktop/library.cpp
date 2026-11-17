@@ -188,6 +188,9 @@ Settings load_settings() {
   }
   if (const Json* keys = root->find("keys"); keys != nullptr) settings.keys = keys->string();
   if (const Json* offset = root->find("audioOffset"); offset != nullptr) settings.audio_offset_ms = static_cast<int>(offset->number());
+  if (const Json* opacity = root->find("sceneOpacity"); opacity != nullptr) {
+    settings.scene_opacity = std::clamp(static_cast<int>(opacity->number()), 0, 100);
+  }
   if (const Json* machine = root->find("machine"); machine != nullptr && machine->items().size() == 6) {
     std::array<int, 6> values{};
     for (std::size_t i = 0; i < values.size(); ++i) values[i] = static_cast<int>(machine->items()[i].number());
@@ -202,6 +205,7 @@ bool save_settings(const Settings& settings) {
        << ",\"fullscreen\":" << (settings.fullscreen ? 1 : 0);
   if (!settings.keys.empty()) text << ",\"keys\":" << quoted(settings.keys);
   if (settings.audio_offset_ms != 0) text << ",\"audioOffset\":" << settings.audio_offset_ms;
+  if (settings.scene_opacity != 100) text << ",\"sceneOpacity\":" << settings.scene_opacity;
   if (settings.machine) {
     text << ",\"machine\":[";
     for (std::size_t i = 0; i < settings.machine->size(); ++i) text << (i == 0 ? "" : ",") << (*settings.machine)[i];
