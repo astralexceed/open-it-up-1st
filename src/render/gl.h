@@ -27,6 +27,7 @@
   X(PFNGLGETUNIFORMLOCATIONPROC, glGetUniformLocation)       \
   X(PFNGLLINKPROGRAMPROC, glLinkProgram)                     \
   X(PFNGLSHADERSOURCEPROC, glShaderSource)                   \
+  X(PFNGLUNIFORM1FPROC, glUniform1f)                         \
   X(PFNGLUNIFORMMATRIX4FVPROC, glUniformMatrix4fv)           \
   X(PFNGLUSEPROGRAMPROC, glUseProgram)                       \
   X(PFNGLVERTEXATTRIBPOINTERPROC, glVertexAttribPointer)
@@ -49,6 +50,7 @@ PIU_GL_FUNCTIONS(PIU_DECLARE)
 #define glGetUniformLocation piu_glGetUniformLocation
 #define glLinkProgram piu_glLinkProgram
 #define glShaderSource piu_glShaderSource
+#define glUniform1f piu_glUniform1f
 #define glUniformMatrix4fv piu_glUniformMatrix4fv
 #define glUseProgram piu_glUseProgram
 #define glVertexAttribPointer piu_glVertexAttribPointer

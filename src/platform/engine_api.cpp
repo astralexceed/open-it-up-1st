@@ -533,6 +533,7 @@ PIU_EXPORT int piu_select_cd_offset() { return engine->stage_config->cd_offset; 
 PIU_EXPORT void piu_select_end() { engine->select.reset(); }
 
 PIU_EXPORT void piu_set_wide(int wide) { engine->renderer.set_wide(wide != 0); }
+PIU_EXPORT void piu_set_scene_opacity(int percent) { engine->renderer.set_scene_opacity(static_cast<float>(percent) / 100.0f); }
 // Next sound effect as sound | channel << 8 | loop << 16, or -1 when there are no more.
 PIU_EXPORT int piu_next_sound() {
   const auto take = [](piu::SoundQueue& queue) { return queue.take(); };

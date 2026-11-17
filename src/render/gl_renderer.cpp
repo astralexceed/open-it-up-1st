@@ -52,14 +52,17 @@ const char* const kSceneFragmentShader = R"(
 precision mediump float;
 #endif
 uniform sampler2D u_texture;
+uniform float u_opacity;
 varying vec2 v_uv;
 varying float v_depth;
 void main() {
   vec4 color = texture2D(u_texture, v_uv);
   // Black fog: a straight line in depth that reaches black at 4/5 of the far plane.
   float fog = clamp(1.0 - v_depth / 12.8, 0.0, 1.0);
-  // A choice of the port: 85% keeps the flight from competing with the arrows.
-  gl_FragColor = vec4(color.rgb * 0.90 * fog, color.a);
+  // A choice of the port: 90% keeps the flight from competing with the arrows. The player can
+  // dim it further from the launcher (u_opacity, 1 by default). Over the black screen, scaling
+  // the color is the same as drawing the whole flight at that opacity.
+  gl_FragColor = vec4(color.rgb * 0.90 * u_opacity * fog, color.a);
 }
 )";
 
@@ -125,11 +128,14 @@ bool GlRenderer::init() {
   scene_position_ = glGetAttribLocation(scene_program_, "a_position");
   scene_uv_ = glGetAttribLocation(scene_program_, "a_uv");
   scene_matrix_ = glGetUniformLocation(scene_program_, "u_matrix");
+  scene_opacity_uniform_ = glGetUniformLocation(scene_program_, "u_opacity");
 
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   return true;
 }
+
+void GlRenderer::set_scene_opacity(float opacity) { scene_opacity_ = std::clamp(opacity, 0.0f, 1.0f); }
 
 GLuint GlRenderer::begin_texture() {
   GLuint texture = 0;
@@ -204,6 +210,7 @@ void GlRenderer::draw_scene(const DrawList& list) {
   // Blending stays on: the flight is mixed by its texture alpha, with no alpha test.
   glUseProgram(scene_program_);
   glUniformMatrix4fv(scene_matrix_, 1, GL_FALSE, list.scene_matrix().data());
+  glUniform1f(scene_opacity_uniform_, scene_opacity_);
   glEnableVertexAttribArray(static_cast<GLuint>(scene_position_));
   glEnableVertexAttribArray(static_cast<GLuint>(scene_uv_));
 

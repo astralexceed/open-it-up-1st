@@ -1,8 +1,10 @@
-# Open It UP: 1st Preservation
+# Open It UP: 1st Reimplementation
 
 An open-source reimplementation of the **Pump It Up: 1st Dance Floor** (1999) engine, made to play the game on modern platforms without the original arcade hardware.
 
 > This repository contains no game files. You need your own copy to play.
+
+> **Web version:** it only works from a web server. Double-clicking `piu.html` will not load the game. See [Web version](#web-version).
 
 ## About
 
@@ -21,30 +23,35 @@ Download your version from the **Releases** section of this repository. None of 
 |---|---|---|
 | Windows | `.exe` | New, in testing |
 | macOS (Apple Silicon) | `.zip` with the `.app` | Supported |
-| Web | `.zip` | Supported |
+| Web | `.zip` (needs a web server, see [below](#web-version)) | Supported |
 
 You will need these files from your own copy:
 
 | File | Purpose | Required? |
 |---|---|---|
-| `19990930.chd` | BGAs, steps, sprites and music | Yes |
+| The game's CHD (any file name) | BGAs, steps, sprites and music | Yes |
 | `piu10.u9` | Extra sound effects (grades, coins, menus and more) | No, but those effects will be missing |
 
 **Windows.** Put the `.exe` in its own folder and open it. The program is not signed, so Windows may block it: choose **More info > Run anyway**.
 
 **macOS.** Unzip the file, put the `.app` in its own folder and open it. It is not signed by Apple, so macOS will block it the first time: allow it in **System Settings > Privacy & Security > Open Anyway**.
 
-**Web.** The page **does not work by double-clicking the file**, because browsers only let it store the game when it is opened from a server. Unzip the `.zip`, open a terminal in that folder and run this ([Python](https://www.python.org/downloads/) required):
-
-```sh
-python3 -m http.server 8000 --bind 127.0.0.1
-```
-
-Leave it running and open <http://localhost:8000/piu.html>. Press `Ctrl+C` to stop it. You need a recent browser with WebGL 2: Chrome, Edge, Firefox or Safari.
-
-You can also upload the contents of the `.zip` to any static host, as long as it is served over **HTTPS**. Each visitor picks their own copy, and it is extracted in their browser. Do not upload the game files to the server.
-
 To modify the game or compile it yourself, see [BUILDING.md](BUILDING.md).
+
+### Web version
+
+The web version **needs a web server**. If you double-click `piu.html`, the browser opens it as a local file and blocks the storage the game needs, so it will not load.
+
+1. Unzip `OpenItUP-Web.zip` into its own folder.
+2. Open a terminal in that folder and start a local server ([Python](https://www.python.org/downloads/) required; on Windows, use `py` if `python3` is not found):
+
+   ```sh
+   python3 -m http.server 8000 --bind 127.0.0.1
+   ```
+
+3. Open <http://localhost:8000/piu.html> in a recent browser with WebGL 2 (Chrome, Edge, Firefox or Safari). Keep the terminal open while you play; `Ctrl+C` stops the server.
+
+Any other web server works too. To put it online, upload the contents of the `.zip` to a static host served over **HTTPS**. Never upload the game files: each visitor picks their own copy, and it is extracted in their browser.
 
 ### Updating and saved data
 
@@ -59,7 +66,7 @@ Extracted files take about 700 MB. On the web, clearing the site's data means ex
 
 ## How to play
 
-1. In the launcher, choose your `19990930.chd` and, if you have it, `piu10.u9`. You only do this once.
+1. In the launcher, choose the game's CHD (any file name) and, if you have it, `piu10.u9`. You only do this once.
 2. Adjust the aspect ratio, language and display mode, then press **Launch game**. Launching is like turning the machine on: it starts with no credits.
 3. Insert coins. By default, 5 coins are 1 credit, and each player pays one credit.
 4. Step on the **center** of your pad on the title screen.
@@ -97,6 +104,10 @@ To change them, open **Additional settings > Map controls** in the launcher. Cli
 
 If the music feels out of step with the arrows, open **Additional settings > Calibrate audio** in the launcher. Listen to the beat, press any key on each one 20 times, and press **Save**. The arrows then wait for what you actually hear. It does not change the game's rules or timing windows. Calibrate again if you change speakers or headphones. **Set to 0** turns it off.
 
+### 3D flight opacity
+
+If the 3D flight background distracts you from the arrows, lower **3D flight opacity** in **Additional settings**. 100% draws it as usual and 0% leaves it black. It only changes how it looks, not the game.
+
 ### Life and grades
 
 You clear the song if your life is still up and you missed no more than half of the rows. With the default setting, you cannot be cut off mid-song on Stage 1. From the stage set by STAGE BREAK onward, the game ends if your life stays at the minimum long enough.
@@ -114,7 +125,9 @@ At the end you get a grade: **S, A, B, C, D or F**. An S requires no Bad or Miss
 | DEMO SOUND | Off, On | On |
 | COIN SETTING (in COIN OPTION) | 1 to 10 coins per credit | 5 |
 
-Use **SAVE AND EXIT** to save. Settings persist after closing the game. Credits are lost when the machine is turned off, as on the original.
+GAME OPTION also has **DEFAULT SETTING**, which puts the five game options back to their defaults (it does not touch the coins), and **CLEAR RANKING**, which is listed as on the original machine. The game never shows a ranking, so clearing it changes nothing you can see.
+
+Use **SAVE AND EXIT** to save, or **EXIT** to leave without saving. Settings persist after closing the game. Credits are lost when the machine is turned off, as on the original.
 
 ## Game modes
 

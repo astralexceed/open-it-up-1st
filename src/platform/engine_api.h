@@ -94,6 +94,8 @@ PIU_EXPORT int piu_select_word(int player);
 PIU_EXPORT int piu_select_cd_offset();
 PIU_EXPORT void piu_select_end();
 PIU_EXPORT void piu_set_wide(int wide);
+// How visible the 3D backgrounds are, from 0 to 100 percent.
+PIU_EXPORT void piu_set_scene_opacity(int percent);
 PIU_EXPORT int piu_next_sound();
 PIU_EXPORT int piu_chart_margin(const char* name);
 PIU_EXPORT int piu_take_audio_stop();
